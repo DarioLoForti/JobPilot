@@ -6,9 +6,11 @@ import {
   Typography, 
   Container, 
   Paper,
-  Alert 
+  Alert,
+  Grid, // <--- Importato Grid
+  Link  // <--- Importato Link
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom'; // <--- Importato RouterLink
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -106,6 +108,17 @@ export default function Login() {
             >
               Accedi
             </Button>
+
+            {/* --- SEZIONE LINK REGISTRAZIONE --- */}
+            <Grid container justifyContent="flex-end">
+              <Grid item>
+                <Link component={RouterLink} to="/register" variant="body2">
+                  {"Non hai un account? Registrati"}
+                </Link>
+              </Grid>
+            </Grid>
+            {/* ---------------------------------- */}
+
           </Box>
         </Paper>
       </Box>
