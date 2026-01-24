@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  # Servizio Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: jobpilot_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: jobpilot_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - jobpilot-net
+
+volumes:
+  pgdata: # Questo serve a non perdere i dati se spegni il container
+
+networks:
+  jobpilot-net:
+    driver: bridge
