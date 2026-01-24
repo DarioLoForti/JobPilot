@@ -1,127 +1,97 @@
 import { useState } from 'react';
-import { 
-  Box, 
-  Button, 
-  TextField, 
-  Typography, 
-  Container, 
-  Paper,
-  Alert,
-  Grid, // <--- Importato Grid
-  Link  // <--- Importato Link
-} from '@mui/material';
-import { useNavigate, Link as RouterLink } from 'react-router-dom'; // <--- Importato RouterLink
+import { useNavigate } from 'react-router-dom';
+import { TextField, InputAdornment } from '@mui/material';
+import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
     try {
-      // Nota: usiamo solo /api/..., il proxy sa che deve andare al backend
-      const response = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess('Login effettuato! Reindirizzamento...');
-        
-        // 1. Salviamo il token nella memoria locale del browser
+      const data = await res.json();
+      if (res.ok) {
         localStorage.setItem('token', data.token);
-        
-        // 2. Salviamo anche i dati utente (per mostrare il nome nella dashboard)
         localStorage.setItem('user', JSON.stringify(data.user));
-
-        // 3. Aspettiamo un secondo (giusto per far vedere il messaggio verde) e cambiamo pagina
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
+        navigate('/dashboard');
+        window.location.reload(); // Per aggiornare la navbar
       } else {
-        setError(data.error || 'Errore durante il login');
+        setError(data.error);
       }
-    } catch (err) {
-      setError('Impossibile contattare il server');
-    }
+    } catch (err) { setError('Errore di connessione'); }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography component="h1" variant="h5">
-            JobPilot Login
-          </Typography>
-          
-          {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mt: 2, width: '100%' }}>{success}</Alert>}
+    <div className="flex min-h-[80vh] items-center justify-center p-4">
+      
+      {/* CARD PRINCIPALE */}
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 p-8 transition-all">
+        
+        {/* Intestazione */}
+        <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Bentornato 👋</h1>
+            <p className="text-slate-500 dark:text-slate-400">Inserisci le tue credenziali per accedere</p>
+        </div>
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Indirizzo Email"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+        {error && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg text-sm text-center">
+                {error}
+            </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Input Email con stile MUI ma colori Tailwind friendly */}
+            <TextField 
+                fullWidth 
+                label="Email" 
+                variant="outlined"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                InputProps={{
+                    startAdornment: <InputAdornment position="start"><EmailIcon className="text-slate-400" /></InputAdornment>,
+                }}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+
+            <TextField 
+                fullWidth 
+                label="Password" 
+                type="password"
+                variant="outlined"
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                InputProps={{
+                    startAdornment: <InputAdornment position="start"><LockIcon className="text-slate-400" /></InputAdornment>,
+                }}
             />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+
+            <button 
+                type="submit" 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5"
             >
-              Accedi
-            </Button>
+                Accedi
+            </button>
+        </form>
 
-            {/* --- SEZIONE LINK REGISTRAZIONE --- */}
-            <Grid container justifyContent="flex-end">
-              <Grid item>
-                <Link component={RouterLink} to="/register" variant="body2">
-                  {"Non hai un account? Registrati"}
-                </Link>
-              </Grid>
-            </Grid>
-            {/* ---------------------------------- */}
+        <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            Non hai ancora un account?{' '}
+            <span 
+                onClick={() => navigate('/register')} 
+                className="font-semibold text-blue-600 hover:text-blue-500 cursor-pointer hover:underline"
+            >
+                Registrati gratis
+            </span>
+        </div>
 
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+      </div>
+    </div>
   );
 }

@@ -20,16 +20,15 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Tabella CANDIDATURE (Il cuore del Job Tracker)
+-- 2. CANDIDATURE
 CREATE TABLE IF NOT EXISTS job_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    company_name VARCHAR(255) NOT NULL,
-    job_title VARCHAR(255) NOT NULL,
-    job_url TEXT,
-    status VARCHAR(50) DEFAULT 'APPLIED', -- 'INTERVIEW', 'REJECTED', 'OFFER'
+    company VARCHAR(255) NOT NULL,
+    position VARCHAR(255) NOT NULL,
+    job_link VARCHAR(500), -- <--- QUESTA È LA RIGA MANCANTE
+    status VARCHAR(50) DEFAULT 'applied', -- wishlist, applied, interview, offer, rejected
     notes TEXT,
-    applied_date DATE DEFAULT CURRENT_DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

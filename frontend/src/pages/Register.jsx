@@ -1,150 +1,60 @@
 import { useState } from 'react';
-import { 
-  Box, 
-  Button, 
-  TextField, 
-  Typography, 
-  Container, 
-  Paper,
-  Alert,
-  Link,
-  Grid
-} from '@mui/material';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { TextField } from '@mui/material';
 
 export default function Register() {
-  const navigate = useNavigate();
-  
-  // Stati per i campi del form
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: ''
-  });
-
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
     try {
-      const response = await fetch('/api/auth/register', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess('Registrazione completata! Reindirizzamento...');
-        
-        // Salviamo subito il token così l'utente è già loggato
+      const data = await res.json();
+      if (res.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1500);
+        navigate('/dashboard');
+        window.location.reload();
       } else {
-        setError(data.error || 'Errore durante la registrazione');
+        setError(data.error);
       }
-    } catch (err) {
-      setError('Impossibile contattare il server');
-    }
+    } catch (err) { setError('Errore di connessione'); }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography component="h1" variant="h5">
-            Crea Account JobPilot
-          </Typography>
-          
-          {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mt: 2, width: '100%' }}>{success}</Alert>}
+    <div className="flex min-h-[80vh] items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 p-8">
+        
+        <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Crea Account 🚀</h1>
+            <p className="text-slate-500 dark:text-slate-400">Uniscini a JobPilot e decolla verso il successo</p>
+        </div>
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3, width: '100%' }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="firstName"
-                  required fullWidth
-                  label="Nome"
-                  autoFocus
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required fullWidth
-                  label="Cognome"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  required fullWidth
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  required fullWidth
-                  name="password"
-                  label="Password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                />
-              </Grid>
-            </Grid>
+        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">{error}</div>}
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-            >
-              Registrati
-            </Button>
-            
-            <Grid container justifyContent="flex-end">
-              <Grid item>
-                <Link component={RouterLink} to="/" variant="body2">
-                  Hai già un account? Accedi
-                </Link>
-              </Grid>
-            </Grid>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+                <TextField label="Nome" fullWidth value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} />
+                <TextField label="Cognome" fullWidth value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} />
+            </div>
+            <TextField label="Email" fullWidth type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+            <TextField label="Password" fullWidth type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+
+            <button type="submit" className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-0.5">
+                Registrati
+            </button>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-slate-500">
+            Hai già un account? <span onClick={() => navigate('/login')} className="font-semibold text-blue-600 cursor-pointer hover:underline">Accedi</span>
+        </div>
+      </div>
+    </div>
   );
 }

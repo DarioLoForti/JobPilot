@@ -1,12 +1,24 @@
 import express from "express";
-import { addJob, getMyJobs } from "../controllers/jobController.js";
+import {
+  getJobs, // Prima era getMyJobs
+  createJob, // Prima era addJob
+  deleteJob,
+  updateJobStatus,
+} from "../controllers/jobController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Tutte queste rotte richiedono il login (protect)
-router.post("/", protect, addJob); // Crea candidatura
-router.get("/", protect, getMyJobs); // Leggi lista
+// 1. Ottieni lista lavori
+router.get("/", protect, getJobs);
 
-// ---> QUESTA È LA RIGA CHE MANCAVA O ERA SBAGLIATA <---
+// 2. Crea nuovo lavoro
+router.post("/", protect, createJob);
+
+// 3. Aggiorna stato (Kanban)
+router.patch("/:id/status", protect, updateJobStatus);
+
+// 4. Elimina lavoro
+router.delete("/:id", protect, deleteJob);
+
 export default router;
