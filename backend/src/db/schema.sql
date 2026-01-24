@@ -26,8 +26,9 @@ CREATE TABLE IF NOT EXISTS job_applications (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     company VARCHAR(255) NOT NULL,
     position VARCHAR(255) NOT NULL,
-    job_link VARCHAR(500), -- <--- QUESTA È LA RIGA MANCANTE
-    status VARCHAR(50) DEFAULT 'applied', -- wishlist, applied, interview, offer, rejected
+    job_link VARCHAR(500),
+    status VARCHAR(50) DEFAULT 'applied',
+    interview_date TIMESTAMP WITH TIME ZONE, -- <--- NUOVA COLONNA
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

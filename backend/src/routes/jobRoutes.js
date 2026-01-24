@@ -1,24 +1,19 @@
 import express from "express";
 import {
-  getJobs, // Prima era getMyJobs
-  createJob, // Prima era addJob
+  getJobs,
+  createJob,
   deleteJob,
   updateJobStatus,
+  updateJob, // <--- Importa la nuova funzione
 } from "../controllers/jobController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// 1. Ottieni lista lavori
 router.get("/", protect, getJobs);
-
-// 2. Crea nuovo lavoro
 router.post("/", protect, createJob);
-
-// 3. Aggiorna stato (Kanban)
-router.patch("/:id/status", protect, updateJobStatus);
-
-// 4. Elimina lavoro
+router.put("/:id", protect, updateJob); // <--- NUOVA ROTTA PUT
 router.delete("/:id", protect, deleteJob);
+router.patch("/:id/status", protect, updateJobStatus);
 
 export default router;

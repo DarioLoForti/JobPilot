@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useMemo, useEffect } from 'react'; // <--- Aggiungi useEffect
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Toaster } from 'react-hot-toast';
 
 // Pagine
 import Login from './pages/Login';
@@ -71,6 +72,15 @@ function App() {
       <CssBaseline />
       <Router>
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+          <Toaster 
+              position="top-center" 
+              toastOptions={{
+                style: {
+                  background: mode === 'dark' ? '#333' : '#fff',
+                  color: mode === 'dark' ? '#fff' : '#333',
+                },
+              }}
+            />
             <Navbar mode={mode} toggleMode={toggleMode} />
             <Routes>
               <Route path="/" element={<Landing />} />
