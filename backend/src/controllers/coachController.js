@@ -7,43 +7,59 @@ const handleAIError = (res, error, context) => {
   if (error.status === 429 || error.message?.includes("429")) {
     return res.status(429).json({
       error:
-        "⚠️ Quota 'Gemini 2.5' esaurita per oggi. Riprova domani o attendi il reset.",
+        "⚠️ Quota 'Gemini 2.5 PRO' esaurita. Il modello Pro ha limiti più stretti. Riprova più tardi.",
     });
   }
   res.status(500).json({ error: `Errore durante ${context}` });
 };
 
 // =================================================================
-// 1. IDENTITY LAB (Test di Personalità & Soft Skills)
+// 1. IDENTITY LAB (Test di Personalità Dinamico)
 // =================================================================
 
 export const getPersonalityTest = async (req, res) => {
+  const userId = req.user.id;
+
   try {
-    const questions = [
-      {
-        id: 1,
-        text: "Quando inizi un nuovo progetto, preferisci avere un piano dettagliato o improvvisare man mano?",
-      },
-      {
-        id: 2,
-        text: "In una discussione accesa con un collega, tendi a mediare per la pace o a imporre la tua logica?",
-      },
-      {
-        id: 3,
-        text: "Dopo una giornata di lavoro intenso, ti ricarichi stando da solo o uscendo con altre persone?",
-      },
-      {
-        id: 4,
-        text: "Come reagisci se un cliente o un capo critica aspramente il tuo lavoro davanti agli altri?",
-      },
-      {
-        id: 5,
-        text: "Cosa ti motiva di più: raggiungere un obiettivo ambizioso o aiutare il team a crescere?",
-      },
-    ];
-    res.json(questions);
+    // Recuperiamo contesto utente
+    const userRes = await query(
+      "SELECT hard_skills, soft_skills, personal_description FROM users WHERE id = $1",
+      [userId],
+    );
+    const user = userRes.rows[0];
+
+    const userContext = user
+      ? `Skills: ${user.hard_skills}, ${user.soft_skills}. Bio: ${user.personal_description}`
+      : "Professionista in cerca di crescita lavorativa.";
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+    const prompt = `Sei un esperto Psicologo del Lavoro.
+    Crea un test "Identity Lab" unico per questo candidato.
+    PROFILO: ${userContext}
+
+    Genera 5 domande situazionali/introspettive per valutare i tratti Big Five (OCEAN) e l'attitudine lavorativa.
+    Rispondi SOLO con un array JSON puro:
+    [
+      { "id": 1, "text": "..." },
+      ...
+    ]`;
+
+    const result = await model.generateContent(prompt);
+    const jsonMatch = result.response.text().match(/\[[\s\S]*\]/);
+
+    if (!jsonMatch) throw new Error("Formato risposta AI non valido");
+
+    const questions = JSON.parse(jsonMatch[0]);
+    const formattedQuestions = questions.map((q, index) => ({
+      id: index + 1,
+      text: q.text,
+    }));
+
+    res.json(formattedQuestions);
   } catch (error) {
-    res.status(500).json({ error: "Errore nel recupero del test." });
+    handleAIError(res, error, "Generazione Test Dinamico");
   }
 };
 
@@ -53,20 +69,18 @@ export const submitPersonalityTest = async (req, res) => {
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // ✅ MANTENUTO GEMINI 2.5 FLASH COME RICHIESTO
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Agisci come uno Psicologo del Lavoro esperto.
-    Analizza queste risposte di un candidato:
-    ${JSON.stringify(answers)}
+    const prompt = `Agisci come uno Psicologo del Lavoro.
+    Analizza queste risposte: ${JSON.stringify(answers)}
 
     Crea un profilo professionale basato su:
-    1. Archetipo (es: "Il Leader Empatico", "L'Analista Visionario").
-    2. Punti di Forza (3 punti chiave).
-    3. Ambiente Ideale (descrizione breve).
+    1. Archetipo (es: "Il Leader Empatico").
+    2. Punti di Forza (3 punti).
+    3. Ambiente Ideale.
     4. Soft Skills dominanti.
 
-    Rispondi ESCLUSIVAMENTE in JSON con questa struttura:
+    Rispondi SOLO in JSON:
     {
       "archetype": "...",
       "description": "...",
@@ -76,11 +90,7 @@ export const submitPersonalityTest = async (req, res) => {
     }`;
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) throw new Error("Errore nel parsing della risposta AI");
-
+    const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
     const profile = JSON.parse(jsonMatch[0]);
 
     await query(
@@ -116,14 +126,11 @@ export const startMockInterview = async (req, res) => {
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // ✅ MANTENUTO GEMINI 2.5 FLASH
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Sei un Senior Recruiter presso ${company}. Stai assumendo un ${position}.
-    Descrizione lavoro: ${description || "Standard per il ruolo"}.
-    
-    Genera una domanda di colloquio difficile (tecnica o comportamentale) specifica per questo ruolo.
-    Rispondi SOLO con il testo della domanda.`;
+    const prompt = `Sei un Senior Recruiter presso ${company} per il ruolo ${position}.
+    Descrizione: ${description}.
+    Genera una domanda di colloquio difficile specifica. Rispondi SOLO con il testo.`;
 
     const result = await model.generateContent(prompt);
     res.json({ question: result.response.text() });
@@ -137,14 +144,10 @@ export const evaluateInterviewAnswer = async (req, res) => {
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // ✅ MANTENUTO GEMINI 2.5 FLASH
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Sei un Recruiter. 
-    Domanda: "${question}"
-    Risposta Candidato: "${answer}"
-    
-    Valuta la risposta (Voto 1-10) e dai un consiglio per migliorarla.
+    const prompt = `Sei un Recruiter. Domanda: "${question}". Risposta: "${answer}".
+    Valuta (1-10) e dai feedback.
     Rispondi SOLO in JSON: { "score": 0, "feedback": "...", "improved_version": "..." }`;
 
     const result = await model.generateContent(prompt);
@@ -173,26 +176,19 @@ export const generateUCAFAssessment = async (req, res) => {
     const job = jobRes.rows[0];
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // ✅ MANTENUTO GEMINI 2.5 FLASH
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Agisci come un Hiring Manager che usa il protocollo U.C.A.F.
-    Devi generare le prove per un candidato per il ruolo di: ${job.position} presso ${job.company}.
-    Descrizione Job: ${job.job_description || "Ruolo standard"}.
+    const prompt = `Agisci come Hiring Manager (Protocollo U.C.A.F.).
+    Ruolo: ${job.position} presso ${job.company}. Descrizione: ${job.job_description}.
 
-    Genera 4 prove distinte secondo queste regole:
-    1. CORE TECHNICAL (Work Sample): Una simulazione pratica realistica basata sulla descrizione.
-    2. COGNITIVE: Una domanda di logica condizionale o problem solving astratto.
-    3. BEHAVIORAL: Una domanda situazionale specifica (STAR method).
-    4. VALUES: Una domanda per capire se i valori del candidato si allineano alla cultura aziendale.
+    Genera 4 prove:
+    1. CORE TECHNICAL (Work Sample realistico).
+    2. COGNITIVE (Logica/Problem Solving).
+    3. BEHAVIORAL (STAR method).
+    4. VALUES (Fit Culturale).
 
     Rispondi SOLO in JSON:
-    {
-      "section_1_task": "...",
-      "section_2_logic": "...",
-      "section_3_behavioral": "...",
-      "section_4_values": "..."
-    }`;
+    { "section_1_task": "...", "section_2_logic": "...", "section_3_behavioral": "...", "section_4_values": "..." }`;
 
     const result = await model.generateContent(prompt);
     const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
@@ -208,26 +204,17 @@ export const evaluateUCAFAssessment = async (req, res) => {
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // ✅ MANTENUTO GEMINI 2.5 FLASH
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Sei il Valutatore Ufficiale del protocollo U.C.A.F.
-    Valuta le risposte del candidato.
-
+    const prompt = `Valutatore U.C.A.F.
     INPUT:
-    1. Technical: "${questions.section_1_task}" -> "${answers.s1}"
-    2. Cognitive: "${questions.section_2_logic}" -> "${answers.s2}"
-    3. Behavioral: "${questions.section_3_behavioral}" -> "${answers.s3}"
-    4. Values: "${questions.section_4_values}" -> "${answers.s4}"
+    1. Tech: "${questions.section_1_task}" -> "${answers.s1}"
+    2. Cog: "${questions.section_2_logic}" -> "${answers.s2}"
+    3. Beh: "${questions.section_3_behavioral}" -> "${answers.s3}"
+    4. Val: "${questions.section_4_values}" -> "${answers.s4}"
 
-    REGOLE DI SCORING (1-5):
-    - 1: Inadeguato
-    - 3: Adeguato
-    - 5: Eccezionale
-
-    PESI: Tech 40%, Cog 20%, Beh 25%, Val 15%.
-
-    Genera il report "Universal Hiring Scorecard" in Markdown.
+    SCORING (1-5). Pesi: Tech 40%, Cog 20%, Beh 25%, Val 15%.
+    Genera report Markdown.
     Rispondi SOLO in JSON: { "score_total": 85, "markdown_report": "# REPORT..." }`;
 
     const result = await model.generateContent(prompt);
@@ -242,5 +229,101 @@ export const evaluateUCAFAssessment = async (req, res) => {
     res.json(evaluation);
   } catch (error) {
     handleAIError(res, error, "Valutazione UCAF");
+  }
+};
+
+// =================================================================
+// 4. SKILL & LOGIC AUDIT (Test 50 Domande Massivo)
+// =================================================================
+
+export const generateQuizTest = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const userRes = await query(
+      "SELECT hard_skills, soft_skills, personal_description FROM users WHERE id = $1",
+      [userId],
+    );
+    const user = userRes.rows[0];
+
+    const userContext = user
+      ? `Skills: ${user.hard_skills}. Bio: ${user.personal_description}`
+      : "Professionista generico.";
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    // ✅ CONFIGURAZIONE JSON MODE: Questo evita errori di sintassi
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const prompt = `Sei un Senior Assessor. Crea un "Deep Audit Exam" di 30 DOMANDE a risposta multipla.
+    PROFILO: ${userContext}
+
+    REGOLE:
+    1. Genera ESATTAMENTE 30 domande.
+    2. Mix: 10 Hard Skills, 10 Situational/Soft, 10 Logica.
+    3. 4 Opzioni per domanda.
+    4. Usa chiavi JSON brevi per risparmiare spazio: 'id', 'q' (domanda), 'o' (opzioni).
+
+    Rispondi SOLO con questo array JSON:
+    [
+      {"id":1, "q":"...", "o":["A","B","C","D"]},
+      ...
+    ]`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    const rawQuestions = JSON.parse(responseText);
+
+    // Mappiamo le chiavi brevi ('q', 'o') a quelle lunghe che il frontend si aspetta ('question', 'options')
+    const formattedQuestions = rawQuestions.map((item) => ({
+      id: item.id,
+      question: item.q,
+      options: item.o,
+    }));
+
+    res.json(formattedQuestions);
+  } catch (error) {
+    handleAIError(res, error, "Generazione Quiz 30");
+  }
+};
+
+export const evaluateQuizTest = async (req, res) => {
+  const { questions, answers } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+    // Per risparmiare token nel prompt di valutazione, inviamo un sunto
+    const prompt = `Correggi questo quiz di 50 domande.
+    Risposte Utente (ID: Risposta): ${JSON.stringify(answers)}
+    
+    Calcola score (0-100).
+    Rispondi SOLO in JSON:
+    {
+      "score": 0,
+      "level": "Junior/Mid/Senior/Expert",
+      "analysis": "Analisi discorsiva...",
+      "top_skills": ["Skill A", "Skill B"],
+      "areas_to_improve": ["Area 1", "Area 2"]
+    }`;
+
+    const result = await model.generateContent(prompt);
+    const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
+    const evaluation = JSON.parse(jsonMatch[0]);
+
+    await query(
+      "INSERT INTO assessments (user_id, type, results) VALUES ($1, 'quiz_audit', $2)",
+      [userId, JSON.stringify(evaluation)],
+    );
+
+    res.json(evaluation);
+  } catch (error) {
+    handleAIError(res, error, "Valutazione Quiz");
   }
 };

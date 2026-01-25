@@ -5,12 +5,25 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdf = require("pdf-parse-fork");
 
+// Helper per gestire l'errore di quota (429) senza far crashare il server
+const handleAIError = (res, error, context) => {
+  console.error(`Errore AI [${context}]:`, error);
+  if (error.status === 429 || error.message?.includes("429")) {
+    return res.status(429).json({
+      error:
+        "⚠️ Quota 'Gemini 2.5 PRO' esaurita. Il modello Pro ha limiti stringenti. Riprova più tardi.",
+    });
+  }
+  res.status(500).json({ error: `Errore durante ${context}` });
+};
+
 // 🤖 1. GENERATORE LETTERA DI PRESENTAZIONE
 export const generateCoverLetter = async (req, res) => {
   const { company, position, tone, userName } = req.body;
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 💎 USO MODELLO PRO
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `Scrivi una lettera di presentazione per ${userName}. 
     Azienda: ${company}. Posizione: ${position}. Tono: ${tone}. 
@@ -19,10 +32,7 @@ export const generateCoverLetter = async (req, res) => {
     const result = await model.generateContent(prompt);
     res.json({ letter: result.response.text() });
   } catch (error) {
-    console.error("Errore Lettera:", error);
-    res
-      .status(500)
-      .json({ error: "Errore durante la generazione della lettera." });
+    handleAIError(res, error, "Generazione Lettera");
   }
 };
 
@@ -67,7 +77,8 @@ export const analyzeCV = async (req, res) => {
     const cvText = pdfData.text;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 💎 USO MODELLO PRO
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `Analizza questo CV e rispondi SOLO in JSON:
     Testo CV: ${cvText}
@@ -86,8 +97,7 @@ export const analyzeCV = async (req, res) => {
 
     res.json(analysisData);
   } catch (error) {
-    console.error("Errore Analisi CV:", error);
-    res.status(500).json({ error: error.message });
+    handleAIError(res, error, "Analisi CV");
   }
 };
 
@@ -120,7 +130,8 @@ export const scrapeJob = async (req, res) => {
       .substring(0, 15000);
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 💎 USO MODELLO PRO
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `Analizza questo annuncio di lavoro. Estrai Azienda, Ruolo e una sintesi dei Requisiti.
     Rispondi SOLO in JSON:
@@ -134,12 +145,11 @@ export const scrapeJob = async (req, res) => {
     if (!jsonMatch) throw new Error("Dati non identificati");
     res.json(JSON.parse(jsonMatch[0]));
   } catch (error) {
-    console.error("Errore Scrape:", error);
-    res.status(500).json({ error: "L'IA non è riuscita a leggere il link." });
+    handleAIError(res, error, "Magic Scrape");
   }
 };
 
-// ⚖️ 6. AI COACH: MATCH ANALYSIS
+// ⚖️ 6. AI COACH: MATCH ANALYSIS (Per il Kanban)
 export const getJobMatch = async (req, res) => {
   const { jobId } = req.params;
   const userId = req.user.id;
@@ -168,7 +178,8 @@ export const getJobMatch = async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 💎 USO MODELLO PRO
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `Confronta il profilo utente con l'annuncio.
     UTENTE: ${user.hard_skills}, ${user.soft_skills}, ${user.personal_description}
@@ -186,8 +197,7 @@ export const getJobMatch = async (req, res) => {
     const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
     res.json(JSON.parse(jsonMatch[0]));
   } catch (error) {
-    console.error("Errore Match AI:", error);
-    res.status(500).json({ error: "Analisi fallita." });
+    handleAIError(res, error, "Match Analysis");
   }
 };
 
@@ -207,7 +217,8 @@ export const extractCVData = async (req, res) => {
     const cvText = pdfData.text;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 💎 USO MODELLO PRO
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const prompt = `Analizza questo CV ed estrai i dati per popolare un database.
     Rispondi ESCLUSIVAMENTE con un oggetto JSON con questa struttura esatta:
@@ -262,7 +273,6 @@ export const extractCVData = async (req, res) => {
       user: updatedUser.rows[0],
     });
   } catch (error) {
-    console.error("Errore estrazione dati CV:", error);
-    res.status(500).json({ error: "L'IA non è riuscita a mappare i dati." });
+    handleAIError(res, error, "Estrazione Dati CV");
   }
 };
