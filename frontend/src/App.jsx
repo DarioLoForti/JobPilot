@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useMemo, useEffect } from 'react'; // <--- Aggiungi useEffect
+import { useState, useMemo, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
@@ -12,6 +12,7 @@ import Jobs from './pages/Jobs';
 import Profile from './pages/Profile';
 import Landing from './pages/Landing';
 import Navbar from './components/Navbar';
+import Coach from './pages/Coach'; // ✅ Import presente
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -81,14 +82,23 @@ function App() {
                 },
               }}
             />
+            
+            {/* La Navbar è qui, quindi sarà visibile su tutte le pagine */}
             <Navbar mode={mode} toggleMode={toggleMode} />
+            
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              {/* ROTTE PROTETTE */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              
+              {/* ✨ NUOVA ROTTA COACH AGGIUNTA QUI */}
+              <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
+
             </Routes>
         </div>
       </Router>

@@ -50,7 +50,10 @@ export default function Navbar({ mode, toggleMode }) {
                 <>
                     <button onClick={() => handleNav('/dashboard')} className={navLink}>Dashboard</button>
                     <button onClick={() => handleNav('/jobs')} className={navLink}>Jobs</button>
+                    {/* ✨ NUOVO LINK COACH */}
+                    <button onClick={() => handleNav('/coach')} className={navLink}>AI Coach</button>
                     <button onClick={() => handleNav('/profile')} className={navLink}>Profilo</button>
+                    
                     <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-2"></div>
                     <button onClick={handleLogout} className="text-sm font-medium text-red-600 hover:text-red-500">Logout</button>
                 </>
@@ -83,7 +86,10 @@ export default function Navbar({ mode, toggleMode }) {
                 <>
                     <button onClick={() => handleNav('/dashboard')} className={mobileLink}>📊 Dashboard</button>
                     <button onClick={() => handleNav('/jobs')} className={mobileLink}>📋 Jobs</button>
+                    {/* ✨ NUOVO LINK COACH MOBILE */}
+                    <button onClick={() => handleNav('/coach')} className={mobileLink}>🧠 AI Coach</button>
                     <button onClick={() => handleNav('/profile')} className={mobileLink}>👤 Profilo</button>
+                    
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                     <button onClick={handleLogout} className={`${mobileLink} text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20`}>🚪 Logout</button>
                 </>

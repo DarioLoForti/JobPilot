@@ -12,11 +12,17 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. Tabella UTENTI
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    profile_picture VARCHAR(255), -- <--- NUOVA COLONNA PER LA FOTO
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    address TEXT,
+    summary TEXT,
+    experience TEXT,
+    education TEXT,
+    skills TEXT,
+    profile_image BYTEA, -- <--- CAMBIATO DA VARCHAR A BYTEA
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -28,7 +34,7 @@ CREATE TABLE IF NOT EXISTS job_applications (
     position VARCHAR(255) NOT NULL,
     job_link VARCHAR(500),
     status VARCHAR(50) DEFAULT 'applied',
-    interview_date TIMESTAMP WITH TIME ZONE, -- <--- NUOVA COLONNA
+    interview_date TIMESTAMP WITH TIME ZONE,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

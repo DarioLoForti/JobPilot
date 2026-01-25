@@ -1,6 +1,6 @@
 import { query } from "../config/db.js";
 
-// GET
+// 📝 1. GET ALL JOBS (Recupera tutte le candidature dell'utente)
 export const getJobs = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -9,25 +9,33 @@ export const getJobs = async (req, res) => {
     const result = await query(text, [userId]);
     res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    console.error("Errore recupero jobs:", error);
     res.status(500).json({ error: "Server Error" });
   }
 };
 
-// POST (Create)
+// 🚀 2. POST (Create - Ora con Job Description)
 export const createJob = async (req, res) => {
   try {
     const userId = req.user.id;
-    // Estraiamo anche 'notes' dal corpo della richiesta
-    const { company, position, job_link, status, interview_date, notes } =
-      req.body;
+    const {
+      company,
+      position,
+      job_link,
+      job_description, // ✨ Nuovo campo estratto dall'IA
+      status,
+      interview_date,
+      notes,
+    } = req.body;
 
     if (!company || !position)
-      return res.status(400).json({ error: "Dati mancanti" });
+      return res
+        .status(400)
+        .json({ error: "Dati obbligatori mancanti (Azienda/Posizione)" });
 
     const text = `
-      INSERT INTO job_applications (user_id, company, position, job_link, status, interview_date, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO job_applications (user_id, company, position, job_link, job_description, status, interview_date, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
     const values = [
@@ -35,38 +43,48 @@ export const createJob = async (req, res) => {
       company,
       position,
       job_link || null,
-      status || "applied",
+      job_description || "", // Salviamo la descrizione per l'AI Coach
+      status || "wishlist",
       interview_date || null,
-      notes || "", // Se non c'è nota, salviamo stringa vuota
+      notes || "",
     ];
 
     const result = await query(text, values);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server Error" });
+    console.error("Errore creazione job:", error);
+    res
+      .status(500)
+      .json({ error: "Errore durante il salvataggio della candidatura." });
   }
 };
 
-// PUT (Update Completo)
+// 🔄 3. PUT (Update Completo - Ora con Job Description)
 export const updateJob = async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    // Estraiamo anche 'notes' qui
-    const { company, position, job_link, status, interview_date, notes } =
-      req.body;
+    const {
+      company,
+      position,
+      job_link,
+      job_description, // ✨ Permettiamo l'aggiornamento della descrizione
+      status,
+      interview_date,
+      notes,
+    } = req.body;
 
     const text = `
       UPDATE job_applications 
-      SET company = $1, position = $2, job_link = $3, status = $4, interview_date = $5, notes = $6
-      WHERE id = $7 AND user_id = $8
+      SET company = $1, position = $2, job_link = $3, job_description = $4, status = $5, interview_date = $6, notes = $7
+      WHERE id = $8 AND user_id = $9
       RETURNING *
     `;
     const values = [
       company,
       position,
       job_link,
+      job_description || "",
       status,
       interview_date || null,
       notes || "",
@@ -77,16 +95,18 @@ export const updateJob = async (req, res) => {
     const result = await query(text, values);
 
     if (result.rows.length === 0)
-      return res.status(404).json({ error: "Job non trovato" });
+      return res
+        .status(404)
+        .json({ error: "Candidatura non trovata o non autorizzato." });
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error(error);
+    console.error("Errore aggiornamento job:", error);
     res.status(500).json({ error: "Update Error" });
   }
 };
 
-// PATCH (Status Only)
+// ⚡ 4. PATCH (Solo cambio Stato per il Drag & Drop)
 export const updateJobStatus = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -96,16 +116,18 @@ export const updateJobStatus = async (req, res) => {
     const text =
       "UPDATE job_applications SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *";
     const result = await query(text, [status, id, userId]);
+
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Not found" });
+
     res.json(result.rows[0]);
   } catch (error) {
-    console.error(error);
+    console.error("Errore status update:", error);
     res.status(500).json({ error: "Status Error" });
   }
 };
 
-// DELETE
+// 🗑️ 5. DELETE
 export const deleteJob = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -113,11 +135,13 @@ export const deleteJob = async (req, res) => {
     const text =
       "DELETE FROM job_applications WHERE id = $1 AND user_id = $2 RETURNING *";
     const result = await query(text, [id, userId]);
+
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Not found" });
-    res.json({ message: "Deleted" });
+
+    res.json({ message: "Candidatura eliminata con successo." });
   } catch (error) {
-    console.error(error);
+    console.error("Errore eliminazione job:", error);
     res.status(500).json({ error: "Delete Error" });
   }
 };
