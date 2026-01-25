@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { 
   TextField, Button, Box, CircularProgress, 
-  Avatar, IconButton, Divider, Grid, Paper, Typography,
-  FormControl, InputLabel, Select, MenuItem, Card, CardContent, Checkbox, FormControlLabel,
-  List, ListItem, ListItemIcon, ListItemText
+  Avatar, IconButton, Typography,
+  FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel,
+  List, ListItem, ListItemIcon, ListItemText, Fade
 } from '@mui/material';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import MyDocument from '../components/CVDocument';
@@ -26,12 +26,12 @@ const DEGREES = ["Diploma di Maturità", "Laurea Triennale", "Laurea Magistrale"
 const SOCIAL_PLATFORMS = ["LinkedIn", "GitHub", "Portfolio", "Sito Web", "Behance", "Twitter / X", "Instagram", "Altro"];
 
 const MENU_ITEMS = [
-    { id: 0, label: "Info Personali & Social", icon: <PersonIcon /> },
-    { id: 1, label: "Descrizione & Skills", icon: <PsychologyIcon /> },
-    { id: 2, label: "Esperienza Lavorativa", icon: <WorkIcon /> },
-    { id: 3, label: "Istruzione e Formazione", icon: <SchoolIcon /> },
-    { id: 4, label: "Altre Competenze", icon: <StarsIcon /> },
-    { id: 5, label: "Analisi AI & Estrazione", icon: <AutoFixHighIcon /> }
+    { id: 0, label: "Info", icon: <PersonIcon fontSize="small" /> },
+    { id: 1, label: "Skills", icon: <PsychologyIcon fontSize="small" /> },
+    { id: 2, label: "Lavoro", icon: <WorkIcon fontSize="small" /> },
+    { id: 3, label: "Studi", icon: <SchoolIcon fontSize="small" /> },
+    { id: 4, label: "Cert", icon: <StarsIcon fontSize="small" /> },
+    { id: 5, label: "AI", icon: <AutoFixHighIcon fontSize="small" /> }
 ];
 
 export default function Profile() {
@@ -143,11 +143,7 @@ export default function Profile() {
       
       const uploadRequest = fetch('/api/ai/upload-cv', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: data });
       
-      await toast.promise(uploadRequest, { 
-        loading: 'Caricamento CV...', 
-        success: 'File caricato con successo!', 
-        error: 'Errore durante l\'upload' 
-      });
+      await toast.promise(uploadRequest, { loading: 'Caricamento CV...', success: 'File caricato con successo!', error: 'Errore durante l\'upload' });
 
       const res = await uploadRequest;
       if (res.ok) {
@@ -173,302 +169,292 @@ export default function Profile() {
       finally { setAnalyzing(false); }
   };
 
-  // 🪄 NUOVA FUNZIONE: Estrazione Dati Automatica dal CV
   const handleExtractData = async () => {
       setExtracting(true);
       const token = localStorage.getItem('token');
       try {
-          const res = await fetch('/api/ai/extract-profile', { 
-            method: 'POST', 
-            headers: { 'Authorization': `Bearer ${token}` } 
-          });
-          
+          const res = await fetch('/api/ai/extract-profile', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
           if (res.ok) {
               const result = await res.json();
               setUser(result.user);
-              syncFormData(result.user); // Popola automaticamente tutti i campi del form
+              syncFormData(result.user); 
               toast.success("Magia! Profilo compilato dai dati del CV ✨");
-              setActiveTab(0); // Torna alla prima tab per vedere i risultati
+              setActiveTab(0); 
           } else {
               const err = await res.json();
               toast.error(err.error || "Impossibile estrarre i dati");
           }
-      } catch (e) {
-          toast.error("Errore durante l'estrazione intelligente");
-      } finally {
-          setExtracting(false);
-      }
+      } catch (e) { toast.error("Errore durante l'estrazione intelligente"); } 
+      finally { setExtracting(false); }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><CircularProgress /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center"><CircularProgress /></div>;
   const avatarSrc = previewUrl ? previewUrl : (user?.has_image ? `/api/users/profile/image?t=${imgKey}` : null);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-6 py-4 pb-24 md:pb-12 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
       {/* HEADER CARD */}
-      <Paper elevation={0} className="p-6 mb-8 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col md:flex-row items-center gap-6 shadow-sm">
-        <div className="relative group">
-            <Avatar src={avatarSrc} sx={{ width: 110, height: 110, fontSize: 45, bgcolor: '#4f46e5', border: '4px solid white', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.1)' }}>
+      <div className="card-3d p-6 md:p-8 mb-6 rounded-3xl md:rounded-[2rem] flex flex-col md:flex-row items-center gap-6 relative overflow-hidden w-full bg-white dark:bg-transparent shadow-xl dark:shadow-none border border-slate-200 dark:border-white/10">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 pointer-events-none"></div>
+        
+        <div className="relative group z-10 shrink-0">
+            <Avatar src={avatarSrc} sx={{ width: {xs: 90, md: 130}, height: {xs: 90, md: 130}, fontSize: 40, bgcolor: '#4f46e5', border: '4px solid rgba(255,255,255,0.2)' }}>
                 {user?.first_name?.[0]}
             </Avatar>
-            <label htmlFor="upload-photo" className="absolute inset-0 flex items-center justify-center bg-indigo-900/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+            <label htmlFor="upload-photo" className="absolute inset-0 flex items-center justify-center bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm">
                 <CloudUploadIcon />
             </label>
             <input type="file" id="upload-photo" className="hidden" accept="image/*" onChange={handleFileChange} />
         </div>
-        <div className="flex-1 text-center md:text-left">
-            <Typography variant="h4" fontWeight="800" className="text-slate-900 dark:text-white">
-                {user?.first_name} {user?.last_name}
+        
+        <div className="flex-1 text-center md:text-left z-10 w-full">
+            <Typography variant="h4" className="font-black text-slate-900 dark:text-white mb-1 text-glow truncate">
+                {user?.first_name} <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-400 dark:to-cyan-400">{user?.last_name}</span>
             </Typography>
-            <Typography variant="body1" className="text-slate-500 dark:text-slate-400 font-medium">
-                Gestione Profilo Professionale & Ottimizzazione CV
+            <Typography variant="body1" className="text-slate-500 dark:text-slate-400 font-medium mb-4 text-sm md:text-base">
+                Gestione Profilo & CV
             </Typography>
+            
+            <div className="block md:hidden w-full">
+                <PDFDownloadLink document={<MyDocument data={formData} image={avatarSrc} />} fileName={`CV_${user?.first_name}_${user?.last_name}.pdf`}>
+                {({ loading }) => (
+                    <Button variant="contained" className="btn-3d-primary w-full py-3 rounded-xl font-bold" disabled={loading} startIcon={<PictureAsPdfIcon />}>
+                        {loading ? '...' : 'Scarica PDF'}
+                    </Button>
+                )}
+                </PDFDownloadLink>
+            </div>
         </div>
-        <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+        
+        <div className="hidden md:block bg-slate-50 dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/10 backdrop-blur-md shadow-lg z-10">
             <PDFDownloadLink document={<MyDocument data={formData} image={avatarSrc} />} fileName={`CV_${user?.first_name}_${user?.last_name}.pdf`}>
-              {({ loading }) => (<Button variant="contained" className="bg-indigo-600 hover:bg-indigo-700" disabled={loading} startIcon={<PictureAsPdfIcon />}>
-                {loading ? 'Generazione...' : 'Scarica CV PDF'}
-              </Button>)}
+              {({ loading }) => (
+                <Button variant="contained" className="btn-3d-primary px-6 py-3 rounded-xl font-bold" disabled={loading} startIcon={<PictureAsPdfIcon />}>
+                    {loading ? 'Generazione...' : 'Scarica CV PDF'}
+                </Button>
+              )}
             </PDFDownloadLink>
         </div>
-      </Paper>
+      </div>
 
-      <Grid container spacing={4}>
-        {/* SIDEBAR NAVIGATION */}
-        <Grid item xs={12} md={3}>
-            <Paper elevation={0} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-                {MENU_ITEMS.map((item) => (
-                    <div 
-                        key={item.id}
-                        onClick={() => setActiveTab(item.id)}
-                        className={`flex items-center gap-3 p-4 cursor-pointer transition-all border-l-4
-                        ${activeTab === item.id 
-                            ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-bold' 
-                            : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    >
-                        <span className={activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}>
-                            {item.icon}
-                        </span>
-                        <span className="text-sm">{item.label}</span>
-                    </div>
-                ))}
-            </Paper>
-        </Grid>
+      <div className="flex flex-col md:flex-row gap-4 w-full">
+        
+        {/* NAVIGATION */}
+        <div className="md:w-64 shrink-0">
+            <div className="md:sticky md:top-24 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex md:block gap-2">
+                <div className="glass-panel p-2 md:p-4 rounded-xl md:rounded-2xl flex md:flex-col gap-2 min-w-max md:min-w-0 w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                    {MENU_ITEMS.map((item) => (
+                        <div 
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`flex items-center gap-3 p-3 cursor-pointer transition-all rounded-xl md:min-w-0 justify-center md:justify-start flex-1
+                            ${activeTab === item.id 
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 font-bold' 
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'}`}
+                        >
+                            <span>{item.icon}</span>
+                            <span className="text-xs md:text-sm">{item.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
 
         {/* CONTENT AREA */}
-        <Grid item xs={12} md={9}>
-            <Paper elevation={0} className="p-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm min-h-[600px]">
+        <div className="flex-1 w-full min-w-0">
+            <div className="glass-panel p-4 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] min-h-[500px] relative w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
                 
-                {activeTab === 0 && (
-                    <div className="animate-fade-in space-y-6">
-                        <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold border-b border-slate-100 dark:border-slate-700 pb-3 mb-6">Dati Anagrafici</Typography>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <TextField label="Nome" fullWidth variant="outlined" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} />
-                            <TextField label="Cognome" fullWidth variant="outlined" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} />
-                            <TextField label="Email" fullWidth variant="filled" disabled value={formData.email} />
-                            <TextField label="Telefono" fullWidth variant="outlined" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                            <TextField label="Indirizzo Completo" fullWidth className="md:col-span-2" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
-                        </div>
-                        
-                        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-6 mt-10">
-                            <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold">Link & Social Presence</Typography>
-                            <Button startIcon={<AddCircleIcon />} size="small" variant="outlined" className="text-indigo-600 border-indigo-200" onClick={() => addItem('socials', {platform: 'LinkedIn', url: ''})}>Aggiungi Link</Button>
-                        </div>
-                        
-                        {formData.socials.map((soc, index) => (
-                            <div key={index} className="flex gap-3 mb-4 items-center bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                                <FormControl size="small" sx={{ width: 160 }}>
-                                    <InputLabel>Piattaforma</InputLabel>
-                                    <Select value={soc.platform} label="Piattaforma" onChange={e => handleArrayChange(index, 'platform', e.target.value, 'socials')}>
-                                        {SOCIAL_PLATFORMS.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
-                                    </Select>
-                                </FormControl>
-                                <TextField label="Indirizzo URL" size="small" fullWidth placeholder="https://..." value={soc.url} onChange={e => handleArrayChange(index, 'url', e.target.value, 'socials')} />
-                                <IconButton color="error" onClick={() => removeItem(index, 'socials')}><DeleteIcon fontSize="small" /></IconButton>
+                <Fade in={true} key={activeTab} timeout={500}>
+                    <div className="w-full">
+                        {activeTab === 0 && (
+                            <div className="space-y-6 w-full">
+                                <Typography variant="h5" className="font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-white/10 pb-4 mb-4">Dati Anagrafici</Typography>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                                    <TextField label="Nome" fullWidth variant="outlined" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} className="input-glass" />
+                                    <TextField label="Cognome" fullWidth variant="outlined" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} className="input-glass" />
+                                    <TextField label="Email" fullWidth variant="filled" disabled value={formData.email} className="input-glass" />
+                                    <TextField label="Telefono" fullWidth variant="outlined" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="input-glass" />
+                                    <TextField label="Indirizzo" fullWidth className="md:col-span-2 input-glass" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                                </div>
+                                
+                                <div className="flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 mb-4 mt-8">
+                                    <Typography variant="h6" className="font-bold text-slate-800 dark:text-white">Social</Typography>
+                                    <Button startIcon={<AddCircleIcon />} size="small" className="text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-400/30 hover:bg-cyan-50 dark:hover:bg-cyan-400/10 rounded-lg px-3" onClick={() => addItem('socials', {platform: 'LinkedIn', url: ''})}>Aggiungi</Button>
+                                </div>
+                                
+                                {formData.socials.map((soc, index) => (
+                                    <div key={index} className="flex flex-col md:flex-row gap-3 mb-4 bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10 relative w-full">
+                                        <FormControl size="small" className="input-glass w-full md:w-48">
+                                            <InputLabel className="text-slate-500 dark:text-slate-400">Piattaforma</InputLabel>
+                                            <Select value={soc.platform} label="Piattaforma" onChange={e => handleArrayChange(index, 'platform', e.target.value, 'socials')} className="text-slate-900 dark:text-white">
+                                                {SOCIAL_PLATFORMS.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                        <TextField label="URL Profilo" size="small" fullWidth value={soc.url} onChange={e => handleArrayChange(index, 'url', e.target.value, 'socials')} className="input-glass" />
+                                        <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end md:self-auto" onClick={() => removeItem(index, 'socials')}><DeleteIcon fontSize="small" /></IconButton>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
+                        )}
 
-                {activeTab === 1 && (
-                     <div className="animate-fade-in space-y-6">
-                        <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold border-b border-slate-100 dark:border-slate-700 pb-3 mb-6">Profilo Professionale</Typography>
-                        <TextField multiline rows={6} fullWidth placeholder="Riassumi la tua carriera e i tuoi obiettivi..." value={formData.personal_description} onChange={e => setFormData({...formData, personal_description: e.target.value})} className="bg-slate-50/50 dark:bg-slate-900/20" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                            <Box className="p-5 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                                <Typography variant="subtitle2" className="font-bold text-indigo-800 dark:text-indigo-300 mb-3 flex items-center gap-2">🛠️ Hard Skills</Typography>
-                                <TextField multiline rows={4} fullWidth variant="standard" placeholder="React, Node.js, AWS, Project Management..." value={formData.hard_skills} onChange={e => setFormData({...formData, hard_skills: e.target.value})} />
-                            </Box>
-                            <Box className="p-5 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-700">
-                                <Typography variant="subtitle2" className="font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">🤝 Soft Skills</Typography>
-                                <TextField multiline rows={4} fullWidth variant="standard" placeholder="Leadership, Problem Solving, Public Speaking..." value={formData.soft_skills} onChange={e => setFormData({...formData, soft_skills: e.target.value})} />
-                            </Box>
-                        </div>
-                    </div>
-                )}
+                        {activeTab === 1 && (
+                             <div className="space-y-6 w-full">
+                                <Typography variant="h5" className="font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-white/10 pb-4 mb-4">Profilo & Skills</Typography>
+                                <TextField multiline rows={6} fullWidth placeholder="Riassumi la tua carriera..." value={formData.personal_description} onChange={e => setFormData({...formData, personal_description: e.target.value})} className="input-glass" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 w-full">
+                                    <div className="p-4 md:p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl border border-indigo-100 dark:border-indigo-500/30 w-full">
+                                        <Typography variant="subtitle1" className="font-bold text-indigo-600 dark:text-indigo-300 mb-3">🛠️ Hard Skills</Typography>
+                                        <TextField multiline rows={4} fullWidth variant="standard" placeholder="React, Node.js, AWS..." value={formData.hard_skills} onChange={e => setFormData({...formData, hard_skills: e.target.value})} className="input-glass" InputProps={{ disableUnderline: true }} />
+                                    </div>
+                                    <div className="p-4 md:p-5 bg-cyan-50 dark:bg-cyan-500/10 rounded-2xl border border-cyan-100 dark:border-cyan-500/30 w-full">
+                                        <Typography variant="subtitle1" className="font-bold text-cyan-600 dark:text-cyan-300 mb-3">🤝 Soft Skills</Typography>
+                                        <TextField multiline rows={4} fullWidth variant="standard" placeholder="Problem Solving..." value={formData.soft_skills} onChange={e => setFormData({...formData, soft_skills: e.target.value})} className="input-glass" InputProps={{ disableUnderline: true }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                {activeTab === 2 && (
-                    <div className="animate-fade-in space-y-6">
-                        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-6">
-                            <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold">Cronologia Professionale</Typography>
-                            <Button startIcon={<AddCircleIcon />} variant="contained" className="bg-indigo-600" size="small" onClick={() => addItem('experiences', {role:'', company:'', dateStart:'', dateEnd:'', current: false, description:''})}>Aggiungi</Button>
-                        </div>
-                        {formData.experiences.map((exp, index) => (
-                            <Card key={index} elevation={0} className="border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20 mb-5 relative">
-                                <IconButton size="small" className="absolute top-3 right-3 text-slate-400 hover:text-red-600" onClick={() => removeItem(index, 'experiences')}><DeleteIcon fontSize="small" /></IconButton>
-                                <CardContent className="space-y-4 pt-6">
-                                    <Grid container spacing={3}>
-                                        <Grid item xs={12} md={6}><TextField label="Qualifica / Ruolo" size="small" fullWidth value={exp.role} onChange={e => handleArrayChange(index, 'role', e.target.value, 'experiences')} /></Grid>
-                                        <Grid item xs={12} md={6}><TextField label="Azienda" size="small" fullWidth value={exp.company} onChange={e => handleArrayChange(index, 'company', e.target.value, 'experiences')} /></Grid>
-                                        <Grid item xs={12} md={4}><TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'experiences')} /></Grid>
-                                        <Grid item xs={12} md={4}><TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'experiences')} disabled={exp.current} /></Grid>
-                                        <Grid item xs={12} md={4}><FormControlLabel control={<Checkbox checked={exp.current || false} onChange={e => handleArrayChange(index, 'current', e.target.checked, 'experiences')} color="indigo" />} label={<Typography variant="caption" className="font-bold">In corso</Typography>} /></Grid>
-                                        <Grid item xs={12}><TextField label="Responsabilità e Traguardi" multiline rows={3} fullWidth size="small" value={exp.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'experiences')} /></Grid>
-                                    </Grid>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                        {activeTab === 2 && (
+                            <div className="space-y-6 w-full">
+                                <div className="flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 mb-4">
+                                    <Typography variant="h5" className="font-black text-slate-800 dark:text-white">Esperienza</Typography>
+                                    <Button startIcon={<AddCircleIcon />} className="text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-400/30 hover:bg-cyan-50 dark:hover:bg-cyan-400/10 px-3 rounded-lg" onClick={() => addItem('experiences', {role:'', company:'', dateStart:'', dateEnd:'', current: false, description:''})}>Aggiungi</Button>
+                                </div>
+                                {formData.experiences.map((exp, index) => (
+                                    <div key={index} className="border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4 md:p-5 rounded-2xl mb-4 relative hover:bg-slate-100 dark:hover:bg-white/10 transition-colors w-full">
+                                        <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'experiences')}><DeleteIcon fontSize="small" /></IconButton>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                            <TextField label="Ruolo" size="small" fullWidth value={exp.role} onChange={e => handleArrayChange(index, 'role', e.target.value, 'experiences')} className="input-glass" />
+                                            <TextField label="Azienda" size="small" fullWidth value={exp.company} onChange={e => handleArrayChange(index, 'company', e.target.value, 'experiences')} className="input-glass" />
+                                            <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                                <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'experiences')} className="input-glass" />
+                                                <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'experiences')} disabled={exp.current} className="input-glass" />
+                                            </div>
+                                            <FormControlLabel control={<Checkbox checked={exp.current || false} onChange={e => handleArrayChange(index, 'current', e.target.checked, 'experiences')} sx={{ color: '#94a3b8', '&.Mui-checked': { color: '#22d3ee' } }} />} label={<Typography variant="caption" className="font-bold text-slate-500 dark:text-slate-300">Lavoro attuale</Typography>} className="md:col-span-2" />
+                                            <TextField label="Descrizione" multiline rows={3} fullWidth size="small" value={exp.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'experiences')} className="input-glass md:col-span-2" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
-                {activeTab === 3 && (
-                    <div className="animate-fade-in space-y-6">
-                        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-6">
-                            <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold">Istruzione e Formazione</Typography>
-                            <Button startIcon={<AddCircleIcon />} variant="contained" className="bg-indigo-600" size="small" onClick={() => addItem('education', {degree:'', school:'', dateStart:'', dateEnd:'', city:'', description:''})}>Aggiungi Titolo</Button>
-                        </div>
-                        {formData.education.map((edu, index) => (
-                            <Card key={index} elevation={0} className="border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20 mb-5 relative">
-                                <IconButton size="small" className="absolute top-2 right-2 text-slate-400 hover:text-red-600" onClick={() => removeItem(index, 'education')}><DeleteIcon fontSize="small" /></IconButton>
-                                <CardContent className="space-y-4 pt-6">
-                                    <Grid container spacing={3}>
-                                        <Grid item xs={12} md={6}>
-                                            <FormControl fullWidth size="small">
-                                                <InputLabel>Titolo di Studio</InputLabel>
-                                                <Select value={DEGREES.includes(edu.degree) ? edu.degree : ''} label="Titolo di Studio" onChange={e => handleArrayChange(index, 'degree', e.target.value, 'education')}>
+                        {activeTab === 3 && (
+                            <div className="space-y-6 w-full">
+                                <div className="flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 mb-4">
+                                    <Typography variant="h5" className="font-black text-slate-800 dark:text-white">Istruzione</Typography>
+                                    <Button startIcon={<AddCircleIcon />} className="text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-400/30 hover:bg-cyan-50 dark:hover:bg-cyan-400/10 px-3 rounded-lg" onClick={() => addItem('education', {degree:'', school:'', dateStart:'', dateEnd:'', city:'', description:''})}>Aggiungi</Button>
+                                </div>
+                                {formData.education.map((edu, index) => (
+                                    <div key={index} className="border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4 md:p-5 rounded-2xl mb-4 relative hover:bg-slate-100 dark:hover:bg-white/10 transition-colors w-full">
+                                        <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'education')}><DeleteIcon fontSize="small" /></IconButton>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                            <FormControl fullWidth size="small" className="input-glass">
+                                                <InputLabel className="text-slate-500 dark:text-slate-400">Titolo</InputLabel>
+                                                <Select value={DEGREES.includes(edu.degree) ? edu.degree : ''} label="Titolo" onChange={e => handleArrayChange(index, 'degree', e.target.value, 'education')} className="text-slate-900 dark:text-white">
                                                     {DEGREES.map((deg) => <MenuItem key={deg} value={deg}>{deg}</MenuItem>)}
                                                 </Select>
                                             </FormControl>
-                                        </Grid>
-                                        <Grid item xs={12} md={6}><TextField label="Istituto / Università" size="small" fullWidth value={edu.school} onChange={e => handleArrayChange(index, 'school', e.target.value, 'education')} /></Grid>
-                                        <Grid item xs={12} md={4}><TextField label="Città" size="small" fullWidth value={edu.city} onChange={e => handleArrayChange(index, 'city', e.target.value, 'education')} /></Grid>
-                                        <Grid item xs={12} md={4}><TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'education')} /></Grid>
-                                        <Grid item xs={12} md={4}><TextField type="date" label="Data Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'education')} /></Grid>
-                                        <Grid item xs={12}><TextField label="Descrizione / Tesi" multiline rows={2} fullWidth size="small" value={edu.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'education')} /></Grid>
-                                    </Grid>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                                            <TextField label="Istituto" size="small" fullWidth value={edu.school} onChange={e => handleArrayChange(index, 'school', e.target.value, 'education')} className="input-glass" />
+                                            <TextField label="Città" size="small" fullWidth value={edu.city} onChange={e => handleArrayChange(index, 'city', e.target.value, 'education')} className="input-glass" />
+                                            <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                                <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'education')} className="input-glass" />
+                                                <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'education')} className="input-glass" />
+                                            </div>
+                                            <TextField label="Tesi / Dettagli" multiline rows={2} fullWidth size="small" value={edu.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'education')} className="input-glass md:col-span-2" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
-                {activeTab === 4 && (
-                    <div className="animate-fade-in space-y-6">
-                        <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3 mb-6">
-                            <Typography variant="h6" className="text-indigo-700 dark:text-indigo-400 font-extrabold">Certificazioni & Riconoscimenti</Typography>
-                            <Button startIcon={<AddCircleIcon />} variant="contained" className="bg-indigo-600" size="small" onClick={() => addItem('certifications', {name:'', year:''})}>Aggiungi</Button>
-                        </div>
-                         {formData.certifications.map((cert, index) => (
-                            <Box key={index} className="flex gap-4 items-center mb-4 bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-                                <TextField label="Nome del Titolo" fullWidth size="small" value={cert.name} onChange={e => handleArrayChange(index, 'name', e.target.value, 'certifications')} />
-                                <TextField label="Data" sx={{width: 140}} size="small" placeholder="YYYY" value={cert.year} onChange={e => handleArrayChange(index, 'year', e.target.value, 'certifications')} />
-                                <IconButton color="error" onClick={() => removeItem(index, 'certifications')}><DeleteIcon /></IconButton>
-                            </Box>
-                         ))}
-                    </div>
-                )}
+                        {activeTab === 4 && (
+                            <div className="space-y-6 w-full">
+                                <div className="flex justify-between items-center border-b border-slate-200 dark:border-white/10 pb-4 mb-4">
+                                    <Typography variant="h5" className="font-black text-slate-800 dark:text-white">Certificazioni</Typography>
+                                    <Button startIcon={<AddCircleIcon />} className="text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-400/30 hover:bg-cyan-50 dark:hover:bg-cyan-400/10 px-3 rounded-lg" onClick={() => addItem('certifications', {name:'', year:''})}>Aggiungi</Button>
+                                </div>
+                                {formData.certifications.map((cert, index) => (
+                                    <div key={index} className="flex flex-col md:flex-row gap-3 mb-4 bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 relative w-full">
+                                        <TextField label="Nome Certificazione" fullWidth size="small" value={cert.name} onChange={e => handleArrayChange(index, 'name', e.target.value, 'certifications')} className="input-glass" />
+                                        <TextField label="Anno" size="small" placeholder="YYYY" value={cert.year} onChange={e => handleArrayChange(index, 'year', e.target.value, 'certifications')} className="input-glass w-full md:w-32" />
+                                        <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end" onClick={() => removeItem(index, 'certifications')}><DeleteIcon fontSize="small" /></IconButton>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
-                {activeTab === 5 && (
-                    <div className="animate-fade-in space-y-8">
-                        <Box className="text-center py-10 border-2 border-dashed border-indigo-200 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-2xl">
-                            <AutoFixHighIcon className="text-indigo-600 dark:text-indigo-400 text-6xl mb-4" />
-                            <Typography variant="h5" fontWeight="800" className="text-indigo-900 dark:text-indigo-200">Ottimizzazione Intelligente</Typography>
-                            <Typography variant="body2" className="text-indigo-600 dark:text-indigo-400 mb-6 max-w-md mx-auto">Analizza il tuo CV o lascia che l'IA compili il tuo profilo partendo dal file PDF.</Typography>
-                            
-                            {formData.cv_filename && (
-                                <Box className="mb-6 inline-flex items-center gap-2 bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-indigo-100 shadow-sm">
-                                    <PictureAsPdfIcon className="text-red-500" fontSize="small" />
-                                    <Typography variant="caption" className="font-bold text-slate-700 dark:text-slate-200">File pronto: {formData.cv_filename}</Typography>
-                                    <CheckCircleIcon className="text-emerald-500" sx={{ fontSize: 16 }} />
-                                </Box>
-                            )}
+                        {activeTab === 5 && (
+                            <div className="space-y-8 text-center w-full">
+                                <div className="p-6 md:p-10 border-2 border-dashed border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem]">
+                                    <AutoFixHighIcon className="text-indigo-500 dark:text-indigo-400 text-6xl md:text-7xl mb-4 filter drop-shadow-lg" />
+                                    <Typography variant="h4" className="font-black text-slate-800 dark:text-white mb-2">AI Optimization</Typography>
+                                    <Typography className="text-slate-500 dark:text-slate-400 mb-8 max-w-lg mx-auto text-sm md:text-base">Carica il tuo CV PDF. L'AI estrarrà i dati per compilare il profilo o analizzerà la qualità.</Typography>
+                                    
+                                    {formData.cv_filename && (
+                                        <div className="mb-8 inline-flex items-center gap-3 bg-white/80 dark:bg-black/30 px-4 py-2 rounded-full border border-slate-200 dark:border-white/10 shadow-lg max-w-full overflow-hidden">
+                                            <PictureAsPdfIcon className="text-red-500 shrink-0" />
+                                            <Typography className="font-bold text-slate-700 dark:text-slate-200 truncate text-sm">{formData.cv_filename}</Typography>
+                                            <CheckCircleIcon className="text-emerald-500 ml-2 shrink-0" fontSize="small" />
+                                        </div>
+                                    )}
 
-                            <Box className="flex flex-col sm:flex-row gap-4 justify-center px-6">
-                                <Button variant="outlined" component="label" className="border-indigo-300 text-indigo-700 dark:text-indigo-300" startIcon={<CloudUploadIcon />}>
-                                    {formData.cv_filename ? "Sostituisci PDF" : "Seleziona PDF"}
-                                    <input type="file" hidden accept="application/pdf" onChange={handleCvUpload} />
-                                </Button>
-                                
-                                {/* TASTO ESTRAZIONE DATI */}
-                                <Button 
-                                    variant="contained" 
-                                    className="bg-purple-600 px-6 hover:bg-purple-700"
-                                    onClick={handleExtractData}
-                                    disabled={extracting || !formData.cv_filename}
-                                    startIcon={extracting ? <CircularProgress size={20} color="inherit"/> : <AutoAwesomeIcon />}
-                                >
-                                    {extracting ? "Estrazione..." : "Auto-Compila Profilo ✨"}
-                                </Button>
+                                    <div className="flex flex-col gap-4 max-w-sm mx-auto w-full">
+                                        <Button variant="outlined" component="label" className="border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-white hover:text-slate-800 dark:hover:text-white py-3 rounded-xl font-bold w-full" startIcon={<CloudUploadIcon />}>
+                                            {formData.cv_filename ? "Sostituisci PDF" : "Carica PDF"}
+                                            <input type="file" hidden accept="application/pdf" onChange={handleCvUpload} />
+                                        </Button>
+                                        
+                                        <Button variant="contained" className="btn-neon py-3 rounded-xl w-full" onClick={handleExtractData} disabled={extracting || !formData.cv_filename} startIcon={extracting ? <CircularProgress size={20} color="inherit"/> : <AutoAwesomeIcon />}>
+                                            {extracting ? "Analisi..." : "Auto-Compila"}
+                                        </Button>
 
-                                <Button 
-                                    variant="contained" 
-                                    className="bg-indigo-600 px-6" 
-                                    onClick={handleAnalyze} 
-                                    disabled={analyzing || !formData.cv_filename} 
-                                    startIcon={analyzing ? <CircularProgress size={20} color="inherit"/> : <AutoFixHighIcon />}
-                                >
-                                    {analyzing ? "Analisi..." : "Analisi Qualità CV"}
-                                </Button>
-                            </Box>
-                        </Box>
-
-                        {analysisResult && (
-                            <div className="bg-white dark:bg-slate-700 p-8 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-xl animate-fade-in">
-                                <div className="flex items-center gap-6 mb-8 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700">
-                                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                        <CircularProgress variant="determinate" value={analysisResult.score} size={85} thickness={5} sx={{ color: analysisResult.score > 70 ? '#10b981' : '#f59e0b' }} />
-                                        <Box sx={{ top: 0, left: 0, bottom: 0, right: 0, position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Typography variant="h6" component="div" fontWeight="800" sx={{ color: 'text.primary' }}>{analysisResult.score}</Typography>
-                                        </Box>
-                                    </Box>
-                                    <div>
-                                        <Typography variant="h5" fontWeight="800" className="text-slate-800 dark:text-white">CV Quality Score</Typography>
-                                        <Typography variant="body2" className="text-slate-500 italic mt-1">{analysisResult.summary}</Typography>
+                                        <Button variant="contained" className="bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl font-bold w-full" onClick={handleAnalyze} disabled={analyzing || !formData.cv_filename} startIcon={analyzing ? <CircularProgress size={20} color="inherit"/> : <AutoFixHighIcon />}>
+                                            {analyzing ? "Analisi..." : "Quality Check"}
+                                        </Button>
                                     </div>
                                 </div>
-                                <Grid container spacing={4}>
-                                    <Grid item xs={12} md={6}>
-                                        <Paper elevation={0} className="p-6 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800 rounded-2xl">
-                                            <Typography variant="subtitle2" className="font-extrabold text-emerald-800 dark:text-emerald-400 flex items-center gap-2 mb-4"><CheckCircleIcon fontSize="small"/> Asset Strategici</Typography>
-                                            <List dense>
-                                                {analysisResult.strengths.map((s,i) => <ListItem key={i} disableGutters><ListItemIcon sx={{ minWidth: 32 }}><CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} /></ListItemIcon><ListItemText primary={s} primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }} /></ListItem>)}
-                                            </List>
-                                        </Paper>
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Paper elevation={0} className="p-6 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-2xl">
-                                            <Typography variant="subtitle2" className="font-extrabold text-amber-800 dark:text-amber-400 flex items-center gap-2 mb-4"><WarningIcon fontSize="small"/> Punti di Debolezza</Typography>
-                                            <List dense>
-                                                {analysisResult.improvements.map((s,i) => <ListItem key={i} disableGutters><ListItemIcon sx={{ minWidth: 32 }}><WarningIcon sx={{ fontSize: 18, color: '#f59e0b' }} /></ListItemIcon><ListItemText primary={s} primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 500 }} /></ListItem>)}
-                                            </List>
-                                        </Paper>
-                                    </Grid>
-                                </Grid>
+
+                                {analysisResult && (
+                                    <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-cyan-500 mt-8 text-left w-full">
+                                        <div className="flex flex-col md:flex-row items-center gap-6 mb-8 p-6 bg-slate-50 dark:bg-black/20 rounded-3xl border border-slate-200 dark:border-white/5">
+                                            <div className="relative inline-flex">
+                                                <CircularProgress variant="determinate" value={analysisResult.score} size={80} thickness={4} sx={{ color: analysisResult.score > 70 ? '#10b981' : '#f59e0b' }} />
+                                                <Box sx={{ top: 0, left: 0, bottom: 0, right: 0, position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Typography variant="h5" className="font-black text-slate-800 dark:text-white">{analysisResult.score}</Typography>
+                                                </Box>
+                                            </div>
+                                            <div className="text-center md:text-left">
+                                                <Typography variant="h5" className="font-black text-slate-800 dark:text-white">CV Score</Typography>
+                                                <Typography className="text-slate-500 dark:text-slate-400 italic mt-1 text-sm">"{analysisResult.summary}"</Typography>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-6">
+                                            <div className="p-5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl">
+                                                <Typography className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-3"><CheckCircleIcon fontSize="small"/> Punti di Forza</Typography>
+                                                <List dense>{analysisResult.strengths.map((s,i) => <ListItem key={i} disablePadding className="mb-1"><ListItemIcon sx={{minWidth:28}}><CheckCircleIcon sx={{fontSize:16, color:'#10b981'}}/></ListItemIcon><ListItemText primary={s} className="text-slate-600 dark:text-slate-300" primaryTypographyProps={{fontSize:13}}/></ListItem>)}</List>
+                                            </div>
+                                            <div className="p-5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl">
+                                                <Typography className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-3"><WarningIcon fontSize="small"/> Miglioramenti</Typography>
+                                                <List dense>{analysisResult.improvements.map((s,i) => <ListItem key={i} disablePadding className="mb-1"><ListItemIcon sx={{minWidth:28}}><WarningIcon sx={{fontSize:16, color:'#f59e0b'}}/></ListItemIcon><ListItemText primary={s} className="text-slate-600 dark:text-slate-300" primaryTypographyProps={{fontSize:13}}/></ListItem>)}</List>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
+                </Fade>
 
                 {activeTab !== 5 && (
-                    <div className="mt-12 flex justify-end border-t border-slate-100 dark:border-slate-700 pt-6">
-                        <Button variant="contained" size="large" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 px-10 py-3 text-lg font-bold shadow-indigo-200 shadow-lg transition-transform hover:scale-105 active:scale-95">Salva Tutto</Button>
+                    <div className="mt-10 flex justify-end pt-6 border-t border-slate-200 dark:border-white/10 sticky bottom-0 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 -mx-4 md:-mx-10 -mb-4 md:-mb-10 rounded-b-[1.5rem] md:rounded-b-[2.5rem] z-20">
+                        <Button variant="contained" size="large" onClick={handleSave} className="btn-neon px-8 py-3 rounded-xl text-lg font-bold shadow-xl w-full md:w-auto">Salva Modifiche</Button>
                     </div>
                 )}
 
-            </Paper>
-        </Grid>
-      </Grid>
+            </div>
+        </div>
+      </div>
     </div>
   );
 }

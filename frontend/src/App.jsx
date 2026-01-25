@@ -4,15 +4,14 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
 
-// Pagine
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Jobs from './pages/Jobs';
 import Profile from './pages/Profile';
 import Landing from './pages/Landing';
+import Coach from './pages/Coach';
 import Navbar from './components/Navbar';
-import Coach from './pages/Coach'; // ✅ Import presente
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -20,10 +19,8 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
-  // Leggiamo la preferenza salvata o usiamo 'light'
-  const [mode, setMode] = useState(localStorage.getItem('theme') || 'light');
+  const [mode, setMode] = useState(localStorage.getItem('theme') || 'dark');
 
-  // --- SINCRONIZZAZIONE TAILWIND ---
   useEffect(() => {
     const root = window.document.documentElement;
     if (mode === 'dark') {
@@ -34,72 +31,57 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [mode]);
-  // ---------------------------------
 
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode,
-          ...(mode === 'light'
-            ? {
-                background: { default: '#f8fafc', paper: '#ffffff' }, // Slate-50 / White
-                primary: { main: '#2563eb' }, // Blue-600
-                text: { primary: '#0f172a', secondary: '#475569' } // Slate-900 / Slate-600
-              }
-            : {
-                background: { default: '#0f172a', paper: '#1e293b' }, // Slate-900 / Slate-800
-                primary: { main: '#3b82f6' }, // Blue-500
-                text: { primary: '#f8fafc', secondary: '#94a3b8' } // Slate-50 / Slate-400
-              }),
+  const theme = useMemo(() => createTheme({
+      palette: {
+        mode,
+        primary: { main: '#2563eb' },
+        background: { 
+            default: mode === 'dark' ? '#0f172a' : '#f1f5f9', // Slate-100 per Light Mode
+            paper: mode === 'dark' ? '#1e293b' : '#ffffff' 
         },
-        typography: {
-            fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            h4: { fontWeight: 700 },
-        },
-        components: {
-          MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } } // Rimuove l'overlay grigio di MUI in dark mode
+        text: {
+            primary: mode === 'dark' ? '#f8fafc' : '#0f172a',
+            secondary: mode === 'dark' ? '#94a3b8' : '#475569',
         }
-      }),
-    [mode],
-  );
+      },
+      typography: { fontFamily: '"Inter", sans-serif' },
+      components: {
+        MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
+        MuiAppBar: { styleOverrides: { root: { backgroundImage: 'none', boxShadow: 'none' } } }
+      }
+    }), [mode]);
 
-  const toggleMode = () => {
-    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
-  };
+  const toggleMode = () => setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-300">
-          <Toaster 
-              position="top-center" 
-              toastOptions={{
-                style: {
-                  background: mode === 'dark' ? '#333' : '#fff',
-                  color: mode === 'dark' ? '#fff' : '#333',
-                },
-              }}
-            />
+        {/* SFONDO GLOBALE: bg-slate-100 (Grigio Chiaro) vs bg-[#0f172a] (Dark) */}
+        <div className="min-h-screen bg-slate-100 dark:bg-[#0f172a] text-slate-900 dark:text-slate-100 transition-colors duration-300 relative">
             
-            {/* La Navbar è qui, quindi sarà visibile su tutte le pagine */}
-            <Navbar mode={mode} toggleMode={toggleMode} />
-            
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              
-              {/* ROTTE PROTETTE */}
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              
-              {/* ✨ NUOVA ROTTA COACH AGGIUNTA QUI */}
-              <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
+            <div className={`fixed inset-0 z-0 pointer-events-none transition-opacity duration-500 ${mode === 'dark' ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[100px] animate-pulse"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+            </div>
 
-            </Routes>
+            <Toaster position="top-right" toastOptions={{ style: { background: mode === 'dark' ? '#1e293b' : '#fff', color: mode === 'dark' ? '#fff' : '#333' } }} />
+            
+            <div className="relative z-10">
+                <Navbar mode={mode} toggleMode={toggleMode} />
+                
+                <Routes>
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                    <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </div>
         </div>
       </Router>
     </ThemeProvider>

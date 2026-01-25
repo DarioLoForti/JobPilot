@@ -1,3 +1,86 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+    /* DEFAULT LIGHT: Sfondo Slate-100 (Grigio Chiarissimo Riposante) */
+    @apply bg-slate-100 text-slate-900 antialiased selection:bg-blue-500 selection:text-white;
+    overflow-x: hidden;
+}
+
+/* DARK MODE: Sfondo Deep Blue Aurora */
+.dark body {
+    @apply bg-[#0f172a] text-slate-100 selection:bg-cyan-500;
+}
+
+/* --- VETRO ETEREO (CARD) --- */
+.glass-panel {
+    @apply relative overflow-hidden transition-all duration-300;
+}
+
+/* LIGHT MODE: Card Bianche su sfondo Grigio (Effetto Carta) */
+.glass-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0; /* Bordo grigio chiaro */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* Ombra leggerissima */
+}
+
+/* DARK MODE: Vetro Scuro */
+.dark .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* --- INPUT PERSONALIZZATI --- */
+.input-glass fieldset {
+    border-color: #cbd5e1; /* Slate-300 */
+    transition: all 0.3s ease;
+}
+.dark .input-glass fieldset {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.input-glass:hover fieldset {
+    border-color: #94a3b8 !important; /* Slate-400 */
+}
+.dark .input-glass:hover fieldset {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Testo Input */
+.input-glass .MuiInputBase-input {
+    color: #1e293b !important; /* Slate-800 */
+}
+.dark .input-glass .MuiInputBase-input {
+    color: #ffffff !important;
+}
+
+/* Label Input */
+.input-glass .MuiInputLabel-root {
+    color: #64748b !important; /* Slate-500 */
+}
+.dark .input-glass .MuiInputLabel-root {
+    color: #94a3b8 !important;
+}
+
+/* --- BOTTONI NEON (Solo Dark) --- */
+.btn-neon {
+    @apply bg-blue-600 text-white font-bold transition-all shadow-lg shadow-blue-500/30;
+}
+.dark .btn-neon {
+    background-image: linear-gradient(to right, #4f46e5 0%, #06b6d4 51%, #4f46e5 100%);
+    background-size: 200% auto;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.dark .btn-neon:hover {
+    background-position: right center;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+}
+
+/* --- SCROLLBAR --- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }

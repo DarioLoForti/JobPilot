@@ -1,13 +1,20 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { TextField, InputAdornment } from '@mui/material';
-import EmailIcon from '@mui/icons-material/Email';
-import LockIcon from '@mui/icons-material/Lock';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  TextField, Button, Paper, Typography, Box, 
+  InputAdornment, IconButton 
+} from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material'; 
+import toast from 'react-hot-toast';
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false); 
   const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,83 +22,111 @@ export default function Login() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
+
       const data = await res.json();
+
       if (res.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        toast.success('Login effettuato!');
         navigate('/dashboard');
-        window.location.reload(); // Per aggiornare la navbar
       } else {
-        setError(data.error);
+        toast.error(data.error || 'Errore nel login');
       }
-    } catch (err) { setError('Errore di connessione'); }
+    } catch (error) {
+      toast.error('Errore di connessione al server');
+    }
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center p-4">
-      
-      {/* CARD PRINCIPALE */}
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 p-8 transition-all">
-        
-        {/* Intestazione */}
-        <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Bentornato 👋</h1>
-            <p className="text-slate-500 dark:text-slate-400">Inserisci le tue credenziali per accedere</p>
-        </div>
-
-        {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg text-sm text-center">
-                {error}
-            </div>
-        )}
+    // FIX: Sfondo Slate-100 (Grigio Chiaro)
+    <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 px-4 transition-colors duration-300">
+      <Paper className="p-8 md:p-10 w-full max-w-md rounded-3xl shadow-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 animate-fade-in">
+        <Box className="text-center mb-8">
+          <Typography variant="h4" className="font-black text-slate-800 dark:text-white mb-2">
+            Bentornato 👋
+          </Typography>
+          <Typography className="text-slate-500 dark:text-slate-400">
+            Inserisci le tue credenziali per accedere.
+          </Typography>
+        </Box>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {/* Input Email con stile MUI ma colori Tailwind friendly */}
-            <TextField 
-                fullWidth 
-                label="Email" 
-                variant="outlined"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                InputProps={{
-                    startAdornment: <InputAdornment position="start"><EmailIcon className="text-slate-400" /></InputAdornment>,
-                }}
-            />
+          <TextField
+            fullWidth
+            label="Email"
+            name="email"
+            type="email"
+            variant="outlined"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.4)' },
+                '&:hover fieldset': { borderColor: '#6366f1' },
+              },
+              '& .MuiInputBase-input': { color: 'inherit' },
+              '& .MuiInputLabel-root': { color: 'gray' },
+            }}
+          />
+          
+          <TextField
+            fullWidth
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'} 
+            variant="outlined"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+            InputProps={{ 
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    className="text-slate-500 dark:text-slate-400"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.4)' },
+                '&:hover fieldset': { borderColor: '#6366f1' },
+              },
+              '& .MuiInputBase-input': { color: 'inherit' },
+              '& .MuiInputLabel-root': { color: 'gray' },
+            }}
+          />
 
-            <TextField 
-                fullWidth 
-                label="Password" 
-                type="password"
-                variant="outlined"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                InputProps={{
-                    startAdornment: <InputAdornment position="start"><LockIcon className="text-slate-400" /></InputAdornment>,
-                }}
-            />
-
-            <button 
-                type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5"
-            >
-                Accedi
-            </button>
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            size="large"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform hover:-translate-y-1"
+          >
+            Accedi
+          </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            Non hai ancora un account?{' '}
-            <span 
-                onClick={() => navigate('/register')} 
-                className="font-semibold text-blue-600 hover:text-blue-500 cursor-pointer hover:underline"
-            >
-                Registrati gratis
-            </span>
+        <div className="mt-8 text-center">
+          <Typography variant="body2" className="text-slate-500 dark:text-slate-400">
+            Non hai un account?{' '}
+            <Link to="/register" className="font-bold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 transition-colors">
+              Registrati qui
+            </Link>
+          </Typography>
         </div>
-
-      </div>
+      </Paper>
     </div>
   );
 }

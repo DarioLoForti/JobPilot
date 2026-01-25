@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { 
   Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, 
-  FormControl, InputLabel, Select, MenuItem, Tooltip, Menu, CircularProgress,
-  ToggleButton, ToggleButtonGroup, InputAdornment, IconButton, Grid 
+  Menu, MenuItem, Tooltip, CircularProgress,
+  ToggleButton, ToggleButtonGroup, InputAdornment, IconButton, Grid, Paper, Typography, Avatar, Fade 
 } from '@mui/material';
 import { 
   Add as AddIcon, MoreVert as MoreVertIcon, Delete as DeleteIcon, 
@@ -11,17 +11,18 @@ import {
   Event as EventIcon, AutoAwesome as AutoAwesomeIcon, 
   ContentCopy as ContentCopyIcon, Search as SearchIcon,
   AutoFixHigh as AutoFixHighIcon,
-  Psychology as PsychologyIcon 
+  Psychology as PsychologyIcon, ViewKanban
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
-import AICoachModal from '../components/AICoachModal'; // Assicurati che il percorso sia corretto
+import AICoachModal from '../components/AICoachModal'; 
 
+// COLONNE: Aggiornate per supportare Light e Dark mode
 const COLUMNS = [
-  { id: 'wishlist', title: '📝 Da Inviare',  style: 'bg-blue-50/50 border-blue-100 dark:bg-slate-800/40 dark:border-slate-700' },
-  { id: 'applied',  title: '🚀 Inviato',     style: 'bg-amber-50/50 border-amber-100 dark:bg-slate-800/40 dark:border-slate-700' },
-  { id: 'interview', title: '🗣️ Colloquio',   style: 'bg-emerald-50/50 border-emerald-100 dark:bg-slate-800/40 dark:border-slate-700' },
-  { id: 'offer',    title: '🎉 Offerta!',    style: 'bg-indigo-50/50 border-indigo-100 dark:bg-slate-800/40 dark:border-slate-700' },
-  { id: 'rejected', title: '❌ Rifiutato',   style: 'bg-rose-50/50 border-rose-100 dark:bg-slate-800/40 dark:border-slate-700' }
+  { id: 'wishlist', title: 'Da Inviare', emoji: '📝', bg: 'bg-slate-50 border-slate-200 dark:bg-slate-500/10 dark:border-slate-500/20' },
+  { id: 'applied',  title: 'Inviato',    emoji: '🚀', bg: 'bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20' },
+  { id: 'interview', title: 'Colloquio',  emoji: '🗣️', bg: 'bg-purple-50 border-purple-200 dark:bg-purple-500/10 dark:border-purple-500/20' },
+  { id: 'offer',    title: 'Offerta',    emoji: '🎉', bg: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20' },
+  { id: 'rejected', title: 'Rifiutato',  emoji: '❌', bg: 'bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/20' }
 ];
 
 export default function Jobs() {
@@ -36,11 +37,9 @@ export default function Jobs() {
   const [currentJobId, setCurrentJobId] = useState(null);
   const [isScraping, setIsScraping] = useState(false);
 
-  // Stati AI Coach
+  // Stati AI
   const [coachOpen, setCoachOpen] = useState(false);
   const [selectedJobForCoach, setSelectedJobForCoach] = useState(null);
-
-  // Stati AI Letter
   const [openLetterModal, setOpenLetterModal] = useState(false);
   const [generatedLetter, setGeneratedLetter] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -68,14 +67,8 @@ export default function Jobs() {
   useEffect(() => { 
     fetchJobs(); 
     const userData = localStorage.getItem('user');
-    
     if (userData && userData !== "undefined") {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (e) {
-        console.error("Errore parsing user:", e);
-        localStorage.removeItem('user');
-      }
+      try { setUser(JSON.parse(userData)); } catch (e) { localStorage.removeItem('user'); }
     }
   }, []);
 
@@ -92,31 +85,21 @@ export default function Jobs() {
     if (!formData.job_link) return toast.error("Incolla prima un link! 🔗");
     setIsScraping(true);
     const token = localStorage.getItem('token');
-    
     try {
       const res = await fetch('/api/ai/scrape-job', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ url: formData.job_link })
       });
-      
       if (res.ok) {
         const data = await res.json();
         setFormData({ 
-          ...formData, 
-          company: data.company, 
-          position: data.position,
-          job_description: data.job_description // Salviamo la descrizione per il coach
+          ...formData, company: data.company, position: data.position, job_description: data.job_description 
         });
-        toast.success("Dati estratti con successo! ✨");
-      } else {
-        toast.error("L'AI non è riuscita a leggere il link.");
-      }
-    } catch (e) {
-      toast.error("Errore di connessione AI");
-    } finally {
-      setIsScraping(false);
-    }
+        toast.success("Dati estratti! ✨");
+      } else toast.error("AI scraping fallito.");
+    } catch (e) { toast.error("Errore AI"); } 
+    finally { setIsScraping(false); }
   };
 
   const onDragEnd = async (result) => {
@@ -125,22 +108,15 @@ export default function Jobs() {
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
     
     const newStatus = destination.droppableId;
-    const updatedJobs = jobs.map(job => 
-        String(job.id) === String(draggableId) ? { ...job, status: newStatus } : job
-    );
+    const updatedJobs = jobs.map(job => String(job.id) === String(draggableId) ? { ...job, status: newStatus } : job);
     setJobs(updatedJobs);
 
     const token = localStorage.getItem('token');
-    try {
-        await fetch(`/api/jobs/${draggableId}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ status: newStatus })
-        });
-    } catch (error) {
-        toast.error("Errore salvataggio spostamento ❌");
-        fetchJobs(); 
-    }
+    await fetch(`/api/jobs/${draggableId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus })
+    });
   };
 
   const handleOpenCreate = () => {
@@ -153,15 +129,7 @@ export default function Jobs() {
     const jobToEdit = jobs.find(j => j.id === selectedJobId);
     if (jobToEdit) {
       const formattedDate = jobToEdit.interview_date ? new Date(jobToEdit.interview_date).toISOString().slice(0, 16) : '';
-      setFormData({
-        company: jobToEdit.company, 
-        position: jobToEdit.position, 
-        job_link: jobToEdit.job_link || '', 
-        job_description: jobToEdit.job_description || '',
-        status: jobToEdit.status, 
-        interview_date: formattedDate,
-        notes: jobToEdit.notes || '' 
-      });
+      setFormData({ ...jobToEdit, interview_date: formattedDate, notes: jobToEdit.notes || '' });
       setCurrentJobId(selectedJobId);
       setIsEditMode(true);
       setOpenModal(true);
@@ -173,10 +141,11 @@ export default function Jobs() {
     if (!formData.company || !formData.position) return toast.error("Dati mancanti! ⚠️");
     const token = localStorage.getItem('token');
     const url = isEditMode ? `/api/jobs/${currentJobId}` : '/api/jobs';
+    const method = isEditMode ? 'PUT' : 'POST';
     
     try {
       const res = await fetch(url, {
-        method: isEditMode ? 'PUT' : 'POST',
+        method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(formData)
       });
@@ -201,12 +170,7 @@ export default function Jobs() {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          company: currentLetterJob.company,
-          position: currentLetterJob.position,
-          tone: letterTone,
-          userName: `${user?.first_name} ${user?.last_name}`
-        })
+        body: JSON.stringify({ company: currentLetterJob.company, position: currentLetterJob.position, tone: letterTone, userName: `${user?.first_name} ${user?.last_name}` })
       });
       if (res.ok) {
         const data = await res.json();
@@ -225,109 +189,112 @@ export default function Jobs() {
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 py-8 animate-fade-in">
+    <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-6 min-h-screen text-slate-900 dark:text-slate-100 pb-24 transition-colors duration-300">
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
-        <div className="flex items-center gap-6 w-full md:w-auto">
-          <div>
-            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Job Board</h1>
-            <p className="text-slate-500 text-sm">Organizza il tuo percorso nel 2026</p>
-          </div>
-          <div className="relative w-full md:w-80">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fontSize="small" />
-            <input 
-              type="text" placeholder="Filtra per azienda o ruolo..." 
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-            />
-          </div>
+      {/* HEADER 3D */}
+      <Paper className="card-3d p-6 md:p-8 mb-8 rounded-[2rem] flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden bg-white dark:bg-transparent border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 pointer-events-none"></div>
+        
+        <div className="flex items-center gap-6 z-10 w-full lg:w-auto">
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-500/20 rounded-2xl border border-indigo-100 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hidden sm:block">
+                <ViewKanban fontSize="large" />
+            </div>
+            <div>
+                <Typography variant="h3" className="font-black text-slate-900 dark:text-white mb-1 text-glow">Job Board</Typography>
+                <Typography className="text-slate-500 dark:text-slate-400 font-medium">Gestisci il flusso delle tue candidature.</Typography>
+            </div>
         </div>
-        <Button 
-          onClick={handleOpenCreate} 
-          variant="contained"
-          startIcon={<AddIcon />}
-          className="bg-indigo-600 hover:bg-indigo-700 px-8 py-3 rounded-2xl shadow-xl shadow-indigo-500/20 normal-case font-bold"
-        >
-          Nuova Candidatura
-        </Button>
-      </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto z-10">
+            <div className="relative w-full sm:w-80">
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                    type="text" placeholder="Cerca azienda o ruolo..." 
+                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 outline-none transition-all backdrop-blur-sm"
+                />
+            </div>
+            <Button onClick={handleOpenCreate} variant="contained" startIcon={<AddIcon />} className="btn-neon px-8 py-3 rounded-xl font-bold text-lg whitespace-nowrap">
+                Nuova Candidatura
+            </Button>
+        </div>
+      </Paper>
 
       {/* KANBAN BOARD */}
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex flex-col lg:flex-row gap-6 overflow-x-auto pb-10 min-h-[650px]">
+        <div className="flex flex-col lg:flex-row gap-6 overflow-x-auto pb-8 min-h-[70vh] items-start">
           {COLUMNS.map(col => (
             <Droppable key={col.id} droppableId={col.id}>
               {(provided, snapshot) => (
                 <div 
                   ref={provided.innerRef} {...provided.droppableProps}
-                  className={`flex-1 min-w-[320px] p-5 rounded-3xl border-2 border-dashed transition-all duration-300 ${col.style} ${snapshot.isDraggingOver ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02]' : 'border-transparent'}`}
+                  className={`flex-1 min-w-[300px] w-full p-4 rounded-[2rem] border transition-all duration-300 glass-panel ${col.bg} ${snapshot.isDraggingOver ? 'ring-2 ring-cyan-400 bg-cyan-50 dark:bg-cyan-500/10' : ''}`}
                 >
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-extrabold text-slate-700 dark:text-slate-200 uppercase text-xs tracking-widest">{col.title}</h3>
-                    <span className="bg-white dark:bg-slate-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                  <div className="flex justify-between items-center mb-6 px-2">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">{col.emoji}</span>
+                        <h3 className="font-black text-slate-700 dark:text-white text-sm uppercase tracking-widest">{col.title}</h3>
+                    </div>
+                    <span className="bg-white dark:bg-black/30 text-slate-700 dark:text-white px-3 py-1 rounded-lg text-xs font-bold border border-slate-200 dark:border-white/10">
                       {filteredJobs.filter(j => j.status === col.id).length}
                     </span>
                   </div>
 
-                  {filteredJobs.filter(j => j.status === col.id).map((job, index) => (
-                    <Draggable key={String(job.id)} draggableId={String(job.id)} index={index}>
-                      {(p, s) => (
-                        <div
-                          ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
-                          className={`bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-4 transition-all ${s.isDragging ? 'shadow-2xl rotate-3 ring-2 ring-indigo-500' : 'hover:border-indigo-300'}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-bold text-slate-800 dark:text-white">{job.position}</h4>
-                            <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedJobId(job.id); }}>
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
-                          </div>
-                          <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium mb-3 flex items-center gap-1">
-                            <WorkIcon sx={{ fontSize: 14 }} /> {job.company}
-                          </p>
+                  <div className="flex flex-col gap-4">
+                    {filteredJobs.filter(j => j.status === col.id).map((job, index) => (
+                        <Draggable key={String(job.id)} draggableId={String(job.id)} index={index}>
+                        {(p, s) => (
+                            <div
+                            ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
+                            className={`p-5 rounded-2xl border transition-all group relative overflow-hidden ${s.isDragging ? 'bg-indigo-600/90 shadow-2xl rotate-2 scale-105 z-50 border-indigo-400 text-white' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20 shadow-sm'}`}
+                            >
+                                {/* Actions Overlay (visible on hover) */}
+                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedJobId(job.id); }} className="bg-slate-200 dark:bg-black/40 hover:bg-slate-300 dark:hover:bg-black/60 text-slate-700 dark:text-white p-1 rounded-lg">
+                                        <MoreVertIcon fontSize="small" />
+                                    </IconButton>
+                                </div>
 
-                          {job.interview_date && (
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg mb-3 w-fit">
-                              <EventIcon sx={{ fontSize: 12 }} /> 
-                              {new Date(job.interview_date).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' })}
-                            </div>
-                          )}
+                                <Typography variant="h6" className={`font-bold mb-1 pr-6 leading-tight ${s.isDragging ? 'text-white' : 'text-slate-800 dark:text-white'}`}>{job.position}</Typography>
+                                <Typography className={`text-sm font-medium mb-4 flex items-center gap-1.5 uppercase tracking-wide ${s.isDragging ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                                    <WorkIcon sx={{ fontSize: 14 }} /> {job.company}
+                                </Typography>
 
-                          <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-50 dark:border-slate-700">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">
-                              {new Date(job.created_at).toLocaleDateString()}
-                            </span>
-                            <div className="flex gap-2">
-                              {job.job_link && (
-                                <Tooltip title="Apri Annuncio">
-                                  <IconButton size="small" href={job.job_link} target="_blank" color="primary">
-                                    <LinkIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              {/* TRIGGER AI COACH */}
-                              <Tooltip title="AI Coach Match">
-                                <IconButton 
-                                  size="small" 
-                                  onClick={(e) => { e.stopPropagation(); setSelectedJobForCoach(job); setCoachOpen(true); }} 
-                                  sx={{ color: '#10b981' }}
-                                >
-                                  <PsychologyIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="AI Letter">
-                                <IconButton size="small" onClick={() => openLetterGenerator(job)} sx={{ color: '#8b5cf6' }}>
-                                  <AutoAwesomeIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
+                                {job.interview_date && (
+                                    <div className="flex items-center gap-2 text-xs font-bold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 px-3 py-1.5 rounded-lg mb-4 w-fit">
+                                        <EventIcon sx={{ fontSize: 14 }} /> 
+                                        {new Date(job.interview_date).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' })}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-end mt-2 pt-3 border-t border-slate-100 dark:border-white/5">
+                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${s.isDragging ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>
+                                        {new Date(job.created_at).toLocaleDateString()}
+                                    </span>
+                                    <div className="flex gap-1">
+                                        {job.job_link && (
+                                            <Tooltip title="Link Annuncio">
+                                                <IconButton size="small" href={job.job_link} target="_blank" className="text-slate-400 hover:text-cyan-500 dark:hover:text-cyan-400"><LinkIcon fontSize="small" /></IconButton>
+                                            </Tooltip>
+                                        )}
+                                        <Tooltip title="AI Coach">
+                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedJobForCoach(job); setCoachOpen(true); }} className="text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400">
+                                                <PsychologyIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="AI Letter">
+                                            <IconButton size="small" onClick={() => openLetterGenerator(job)} className="text-slate-400 hover:text-purple-500 dark:hover:text-purple-400">
+                                                <AutoAwesomeIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </div>
+                                </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+                        )}
+                        </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
                 </div>
               )}
             </Droppable>
@@ -336,18 +303,20 @@ export default function Jobs() {
       </DragDropContext>
 
       {/* MODALE CREATE/EDIT */}
-      <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: '24px' } }}>
-        <DialogTitle className="font-bold">{isEditMode ? "Modifica Candidatura" : "Nuova Opportunità"}</DialogTitle>
-        <DialogContent>
+      <Dialog open={openModal} onClose={() => setOpenModal(false)} fullWidth maxWidth="sm" PaperProps={{ className: 'glass-panel border border-slate-200 dark:border-white/10 bg-white dark:!bg-[#0f172a]', sx: { borderRadius: '24px' } }}>
+        <DialogTitle className="font-black text-slate-900 dark:text-white text-xl border-b border-slate-200 dark:border-white/10 pb-4">
+            {isEditMode ? "Modifica Candidatura" : "Nuova Opportunità"}
+        </DialogTitle>
+        <DialogContent className="pt-6">
           <TextField 
             margin="normal" label="Link Annuncio" fullWidth 
             value={formData.job_link} onChange={e => setFormData({...formData, job_link: e.target.value})}
-            placeholder="Incolla URL di LinkedIn, Indeed..."
+            placeholder="Incolla URL..." className="input-glass bg-slate-50 dark:bg-black/20 rounded-xl"
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title="Usa l'AI per compilare">
-                    <IconButton onClick={handleMagicScrape} disabled={isScraping} color="secondary">
+                  <Tooltip title="Auto-fill con AI">
+                    <IconButton onClick={handleMagicScrape} disabled={isScraping} className="text-cyan-500 dark:text-cyan-400">
                       {isScraping ? <CircularProgress size={20} /> : <AutoFixHighIcon />}
                     </IconButton>
                   </Tooltip>
@@ -355,77 +324,72 @@ export default function Jobs() {
               ),
             }}
           />
-          <Grid container spacing={2}>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
-              <TextField margin="normal" label="Azienda *" fullWidth value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} />
+              <TextField label="Azienda *" fullWidth value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} className="input-glass bg-slate-50 dark:bg-black/20 rounded-xl" />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField margin="normal" label="Ruolo *" fullWidth value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} />
+              <TextField label="Ruolo *" fullWidth value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} className="input-glass bg-slate-50 dark:bg-black/20 rounded-xl" />
             </Grid>
           </Grid>
-          <div className="mt-4">
-            <label className="text-xs font-bold text-slate-500 block mb-2 uppercase tracking-wider">Data e Ora Colloquio</label>
+          <div className="mt-6 mb-2">
+            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2 uppercase tracking-wider">Data Colloquio</label>
             <input 
               type="datetime-local" value={formData.interview_date} 
               onChange={e => setFormData({...formData, interview_date: e.target.value})} 
-              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:border-indigo-500 transition-all" 
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white rounded-xl p-3 outline-none focus:border-cyan-500 transition-all" 
             />
           </div>
-          <TextField margin="normal" label="Note Strategiche" fullWidth multiline rows={3} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+          <TextField margin="normal" label="Note Strategiche" fullWidth multiline rows={3} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="input-glass bg-slate-50 dark:bg-black/20 rounded-xl" />
         </DialogContent>
-        <DialogActions className="p-6">
-          <Button onClick={() => setOpenModal(false)} sx={{ color: 'slate.500' }}>Chiudi</Button>
-          <Button onClick={handleSave} variant="contained" className="bg-indigo-600 rounded-xl px-6">Salva Candidatura</Button>
+        <DialogActions className="p-6 border-t border-slate-200 dark:border-white/10">
+          <Button onClick={() => setOpenModal(false)} className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">Annulla</Button>
+          <Button onClick={handleSave} variant="contained" className="btn-neon px-8 rounded-xl font-bold">Salva</Button>
         </DialogActions>
       </Dialog>
 
       {/* MENU CONTEXT */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' } }}>
-        <MenuItem onClick={handleOpenEdit}><EditIcon sx={{ mr: 1, fontSize: 18, color: 'primary.main' }} /> Modifica</MenuItem>
-        <MenuItem onClick={() => { handleDelete(selectedJobId); setAnchorEl(null); }} sx={{ color: 'error.main' }}><DeleteIcon sx={{ mr: 1, fontSize: 18 }} /> Elimina</MenuItem>
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ className: 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white', sx: { borderRadius: '12px' } }}>
+        <MenuItem onClick={handleOpenEdit} className="hover:bg-slate-100 dark:hover:bg-white/5"><EditIcon sx={{ mr: 1, fontSize: 18, color: '#22d3ee' }} /> Modifica</MenuItem>
+        <MenuItem onClick={() => { handleDelete(selectedJobId); setAnchorEl(null); }} className="hover:bg-slate-100 dark:hover:bg-white/5 text-red-500 dark:text-red-400"><DeleteIcon sx={{ mr: 1, fontSize: 18 }} /> Elimina</MenuItem>
       </Menu>
 
-      {/* MODALE LETTERA AI */}
-      <Dialog open={openLetterModal} onClose={() => setOpenLetterModal(false)} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: '24px' } }}>
-        <DialogTitle className="flex items-center gap-2 font-black text-indigo-600">
-          <AutoAwesomeIcon /> Personal AI Ghostwriter
+      {/* MODALE AI LETTER */}
+      <Dialog open={openLetterModal} onClose={() => setOpenLetterModal(false)} fullWidth maxWidth="md" PaperProps={{ className: 'glass-panel bg-white dark:!bg-[#0f172a] border border-slate-200 dark:border-white/10', sx: { borderRadius: '24px' } }}>
+        <DialogTitle className="flex items-center gap-2 font-black text-slate-900 dark:text-white border-b border-slate-200 dark:border-white/10 pb-4">
+          <AutoAwesomeIcon className="text-purple-500 dark:text-purple-400" /> Personal AI Ghostwriter
         </DialogTitle>
-        <DialogContent>
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
-            <ToggleButtonGroup value={letterTone} exclusive onChange={(e, v) => v && setLetterTone(v)} size="small" color="primary">
-              <ToggleButton value="formal" className="normal-case">💼 Formale</ToggleButton>
-              <ToggleButton value="modern" className="normal-case">🚀 Moderno</ToggleButton>
-              <ToggleButton value="bold" className="normal-case">🦁 Audace</ToggleButton>
+        <DialogContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-6 bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
+            <ToggleButtonGroup value={letterTone} exclusive onChange={(e, v) => v && setLetterTone(v)} size="small" className="bg-slate-200 dark:bg-black/20 rounded-xl">
+              <ToggleButton value="formal" className="text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10 px-4">👔 Formale</ToggleButton>
+              <ToggleButton value="modern" className="text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10 px-4">🚀 Moderno</ToggleButton>
+              <ToggleButton value="bold" className="text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10 px-4">🦁 Audace</ToggleButton>
             </ToggleButtonGroup>
             <Button 
-              variant="contained" color="secondary" onClick={handleGenerateAi} disabled={aiLoading}
+              variant="contained" onClick={handleGenerateAi} disabled={aiLoading}
               startIcon={aiLoading ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeIcon />}
-              className="bg-indigo-600"
+              className="bg-purple-600 hover:bg-purple-700 rounded-xl font-bold px-6 text-white"
             >
-              {aiLoading ? "L'AI sta scrivendo..." : "Rigenera Lettera"}
+              {aiLoading ? "Scrivendo..." : "Genera Lettera"}
             </Button>
           </div>
           <TextField 
             multiline rows={12} fullWidth value={generatedLetter} onChange={e => setGeneratedLetter(e.target.value)}
-            className="bg-white dark:bg-slate-800 rounded-2xl"
-            sx={{ '& .MuiInputBase-root': { fontFamily: 'serif', lineHeight: 1.8 } }}
+            className="input-glass bg-slate-50 dark:bg-black/20 rounded-2xl" placeholder="L'AI scriverà qui la tua lettera..."
+            sx={{ '& .MuiInputBase-root': { fontFamily: 'serif', lineHeight: 1.8, fontSize: '1.1rem' } }}
           />
         </DialogContent>
-        <DialogActions className="p-6">
-          <Button onClick={() => setOpenLetterModal(false)}>Indietro</Button>
-          <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={() => { navigator.clipboard.writeText(generatedLetter); toast.success("Copiato!"); }}>Copia Testo</Button>
+        <DialogActions className="p-6 border-t border-slate-200 dark:border-white/10">
+          <Button onClick={() => setOpenLetterModal(false)} className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">Chiudi</Button>
+          <Button variant="contained" startIcon={<ContentCopyIcon />} onClick={() => { navigator.clipboard.writeText(generatedLetter); toast.success("Copiato!"); }} className="btn-neon rounded-xl">Copia</Button>
         </DialogActions>
       </Dialog>
 
-      {/* MODALE AI COACH */}
       <AICoachModal 
-        open={coachOpen}
-        onClose={() => setCoachOpen(false)}
-        jobId={selectedJobForCoach?.id}
-        jobTitle={selectedJobForCoach?.position}
-        company={selectedJobForCoach?.company}
+        open={coachOpen} onClose={() => setCoachOpen(false)}
+        jobId={selectedJobForCoach?.id} jobTitle={selectedJobForCoach?.position} company={selectedJobForCoach?.company}
       />
-
     </div>
   );
 }

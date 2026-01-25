@@ -1,61 +1,28 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { TextField, Button, InputAdornment, IconButton, Alert } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  TextField, Button, Paper, Typography, Box, 
+  InputAdornment, IconButton 
+} from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material'; 
 import toast from 'react-hot-toast';
 
 export default function Register() {
-  const navigate = useNavigate();
-  
-  // Dati del form
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
-    password: ''
+    password: '',
   });
+  const [showPassword, setShowPassword] = useState(false); 
+  const navigate = useNavigate();
 
-  // Stato per gli errori specifici dei campi (per evidenziare in rosso)
-  const [formErrors, setFormErrors] = useState({});
-  
-  // Stato per mostrare/nascondere la password
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Funzione di Validazione
-  const validate = () => {
-    const errors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!formData.first_name.trim()) errors.first_name = "Il nome è obbligatorio";
-    if (!formData.last_name.trim()) errors.last_name = "Il cognome è obbligatorio";
-    
-    if (!formData.email) {
-        errors.email = "L'email è obbligatoria";
-    } else if (!emailRegex.test(formData.email)) {
-        errors.email = "Inserisci un'email valida (es. nome@mail.com)";
-    }
-
-    if (!formData.password) {
-        errors.password = "La password è obbligatoria";
-    } else if (formData.password.length < 6) {
-        errors.password = "La password è troppo corta (minimo 6 caratteri)";
-    }
-
-    setFormErrors(errors);
-    // Restituisce true se non ci sono errori (l'oggetto errors è vuoto)
-    return Object.keys(errors).length === 0;
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // 1. Eseguiamo la validazione locale prima di chiamare il server
-    if (!validate()) {
-        toast.error("Controlla i campi evidenziati in rosso 🔴");
-        return;
-    }
-
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -66,123 +33,105 @@ export default function Register() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Registrazione completata! Benvenuto 🎉");
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data));
-        navigate('/dashboard');
+        toast.success('Registrazione completata! Ora accedi.');
+        navigate('/');
       } else {
-        // Gestione errori dal server (es. email già esistente)
-        toast.error(data.error || "Errore durante la registrazione");
-        
-        // Se l'errore riguarda l'email duplicata, evidenziamo il campo email
-        if (data.error && data.error.includes("email")) {
-            setFormErrors(prev => ({ ...prev, email: "Email già in uso" }));
-        }
+        toast.error(data.error || 'Errore nella registrazione');
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Errore di connessione al server ❌");
+      toast.error('Errore di connessione al server');
     }
   };
 
+  // Stile condiviso per i TextField per pulizia codice
+  const textFieldStyle = {
+    '& .MuiOutlinedInput-root': {
+        '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.4)' },
+        '&:hover fieldset': { borderColor: '#6366f1' },
+    },
+    '& .MuiInputBase-input': { color: 'inherit' },
+    '& .MuiInputLabel-root': { color: 'gray' },
+  };
+
   return (
-    <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900 px-4">
-      <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-        
-        <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Crea Account</h1>
-            <p className="text-slate-500 dark:text-slate-400">Inizia a gestire la tua carriera con JobPilot</p>
-        </div>
+    // FIX: Sfondo Slate-100 (Grigio Chiaro)
+    <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 px-4 transition-colors duration-300 py-10">
+      <Paper className="p-8 md:p-10 w-full max-w-lg rounded-3xl shadow-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 animate-fade-in">
+        <Box className="text-center mb-8">
+          <Typography variant="h4" className="font-black text-slate-800 dark:text-white mb-2">
+            Crea Account 🚀
+          </Typography>
+          <Typography className="text-slate-500 dark:text-slate-400">
+            Inizia subito a potenziare la tua carriera.
+          </Typography>
+        </Box>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          
-          <div className="grid grid-cols-2 gap-4">
-            <TextField 
-                label="Nome" 
-                variant="outlined" 
-                fullWidth 
-                value={formData.first_name}
-                onChange={(e) => {
-                    setFormData({...formData, first_name: e.target.value});
-                    // Rimuove l'errore appena l'utente inizia a scrivere
-                    if(formErrors.first_name) setFormErrors({...formErrors, first_name: ''});
-                }}
-                error={!!formErrors.first_name} // Bordo Rosso se true
-                helperText={formErrors.first_name} // Messaggio di errore sotto
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <TextField
+              fullWidth label="Nome" name="first_name" variant="outlined"
+              value={formData.first_name} onChange={handleChange} required
+              className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+              sx={textFieldStyle}
             />
-            <TextField 
-                label="Cognome" 
-                variant="outlined" 
-                fullWidth 
-                value={formData.last_name}
-                onChange={(e) => {
-                    setFormData({...formData, last_name: e.target.value});
-                    if(formErrors.last_name) setFormErrors({...formErrors, last_name: ''});
-                }}
-                error={!!formErrors.last_name}
-                helperText={formErrors.last_name}
+            <TextField
+              fullWidth label="Cognome" name="last_name" variant="outlined"
+              value={formData.last_name} onChange={handleChange} required
+              className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+              sx={textFieldStyle}
             />
           </div>
 
-          <TextField 
-            label="Email" 
-            type="email" 
-            fullWidth 
-            value={formData.email}
-            onChange={(e) => {
-                setFormData({...formData, email: e.target.value});
-                if(formErrors.email) setFormErrors({...formErrors, email: ''});
-            }}
-            error={!!formErrors.email}
-            helperText={formErrors.email}
+          <TextField
+            fullWidth label="Email" name="email" type="email" variant="outlined"
+            value={formData.email} onChange={handleChange} required
+            className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+            sx={textFieldStyle}
           />
 
-          <div>
-            <TextField 
-                label="Password" 
-                type={showPassword ? "text" : "password"} 
-                fullWidth 
-                value={formData.password}
-                onChange={(e) => {
-                    setFormData({...formData, password: e.target.value});
-                    if(formErrors.password) setFormErrors({...formErrors, password: ''});
-                }}
-                error={!!formErrors.password}
-                helperText={formErrors.password} // Mostra l'errore se c'è
-                InputProps={{
-                endAdornment: (
-                    <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                    </InputAdornment>
-                ),
-                }}
-            />
-            {/* SUGGERIMENTI PASSWORD (Visibili solo se non c'è un errore specifico per non affollare la UI) */}
-            {!formErrors.password && (
-                <p className="text-xs text-slate-500 mt-2 ml-1">
-                    ℹ️ La password deve contenere almeno <strong>6 caratteri</strong>.
-                </p>
-            )}
-          </div>
+          <TextField
+            fullWidth
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'} 
+            variant="outlined"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            className="bg-slate-50 dark:bg-slate-900 rounded-lg"
+            InputProps={{ 
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    className="text-slate-500 dark:text-slate-400"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={textFieldStyle}
+          />
 
-          <Button 
-            type="submit" 
-            variant="contained" 
-            fullWidth 
-            size="large"
-            className="bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30"
+          <Button
+            type="submit" fullWidth variant="contained" size="large"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform hover:-translate-y-1 mt-4"
           >
-            Registrati 🚀
+            Registrati
           </Button>
         </form>
 
-        <p className="text-center mt-6 text-slate-600 dark:text-slate-400">
-          Hai già un account?{' '}
-          <Link to="/login" className="text-blue-600 font-bold hover:underline">Accedi qui</Link>
-        </p>
-      </div>
+        <div className="mt-8 text-center">
+          <Typography variant="body2" className="text-slate-500 dark:text-slate-400">
+            Hai già un account?{' '}
+            <Link to="/" className="font-bold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 transition-colors">
+              Accedi ora
+            </Link>
+          </Typography>
+        </div>
+      </Paper>
     </div>
   );
 }
