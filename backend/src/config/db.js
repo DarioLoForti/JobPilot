@@ -5,42 +5,51 @@ dotenv.config();
 
 const { Pool } = pg;
 
-// --- DIAGNOSTICA (Così vediamo nei log se Render passa i dati) ---
-console.log("🔍 CONFIGURAZIONE DB AVVIATA");
-console.log("1. Ambiente:", process.env.NODE_ENV);
-console.log(
-  "2. DATABASE_URL presente?",
-  process.env.DATABASE_URL ? "SÌ ✅" : "NO ❌ (Userà localhost e fallirà)",
-);
-
 const isProduction = process.env.NODE_ENV === "production";
 
-// Configurazione della connessione
-const pool = new Pool({
-  // Su Render usiamo la connectionString (tutto in uno)
-  connectionString: process.env.DATABASE_URL,
+// --- DIAGNOSTICA ---
+console.log("🔍 CONFIGURAZIONE DB AVVIATA");
+console.log(
+  `🌍 Ambiente: ${isProduction ? "PRODUZIONE (Render)" : "SVILUPPO (Locale)"}`,
+);
 
-  // SSL è OBBLIGATORIO su Render, ma va disattivato in locale se non lo usi
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-});
+let poolConfig;
 
-// Listener per errori globali
+// LOGICA IBRIDA:
+if (process.env.DATABASE_URL) {
+  // CASO 1: SIAMO SU RENDER (o c'è una connection string)
+  console.log("✅ Rilevata Connection String (Modalità Cloud)");
+  poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Obbligatorio per Render
+  };
+} else {
+  // CASO 2: SIAMO IN LOCALE (Usa le variabili vecchie)
+  console.log("🏠 Nessuna Connection String rilevata (Modalità Locale)");
+  poolConfig = {
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+    ssl: false, // Niente SSL in locale
+  };
+}
+
+const pool = new Pool(poolConfig);
+
+// Listener errori
 pool.on("error", (err) => {
-  console.error("❌ Errore imprevisto nel client PostgreSQL", err);
+  console.error("❌ Errore imprevisto client PG:", err);
   process.exit(-1);
 });
 
-// Test connessione immediato all'avvio
+// Test connessione
 pool
   .connect()
-  .then(() => console.log("✅ CONNESSIONE AL DATABASE RIUSCITA!"))
+  .then(() => console.log("✅ CONNESSIONE DATABASE RIUSCITA!"))
   .catch((err) => {
-    console.error("❌ ERRORE FATALE CONNESSIONE DB:", err.message);
-    if (err.message.includes("ECONNREFUSED")) {
-      console.error(
-        "👉 SUGGERIMENTO: Manca la variabile DATABASE_URL su Render o è sbagliata.",
-      );
-    }
+    console.error("❌ ERRORE CONNESSIONE DB:", err.message);
   });
 
 export const query = (text, params) => pool.query(text, params);
