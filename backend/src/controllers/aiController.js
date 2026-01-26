@@ -18,7 +18,7 @@ const handleAIError = (res, error, context) => {
 };
 
 // ------------------------------------------------------------------
-// 1. GENERATORE LETTERA (Prompt Aggiornato + Parsing Varianti)
+// 1. GENERATORE LETTERA
 // ------------------------------------------------------------------
 export const generateCoverLetter = async (req, res) => {
   const { company, position, tone, userName } = req.body;
@@ -26,7 +26,6 @@ export const generateCoverLetter = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    // Recuperiamo skills per contesto extra (opzionale)
     const userRes = await query(
       "SELECT hard_skills, soft_skills FROM users WHERE id = $1",
       [req.user.id],
@@ -35,7 +34,7 @@ export const generateCoverLetter = async (req, res) => {
       ? `${userRes.rows[0].hard_skills}, ${userRes.rows[0].soft_skills}`
       : "Generali";
 
-    const prompt = `Agisci come un Career Advisor e Senior Recruiter AI, esperto nella scrittura di lettere di presentazione persuasive e ottimizzate per ATS.
+    const prompt = `Agisci come un Career Advisor e Senior Recruiter AI.
 
 ====================
 INPUT
@@ -43,47 +42,22 @@ INPUT
 Candidato: ${userName}
 Azienda: ${company}
 Posizione: ${position}
-Tono richiesto: ${tone} (scegli tra Formale / Neutro / Confidente)
-Skills principali e punti di forza: ${userSkills}
+Tono: ${tone}
+Skills: ${userSkills}
 
 ====================
 COMPITO
 ====================
-Genera **una lettera di presentazione professionale**, in italiano, che:
-1. Introduca il candidato in modo chiaro e personale
-2. Colleghi le competenze, esperienze e risultati del candidato alla posizione
-3. Utilizzi le parole chiave rilevanti dell’annuncio (se disponibili)
-4. Rispetti il tono scelto
-5. Concluda con una call-to-action cortese e motivata
-
-Crea **3 varianti distinte** della lettera, ciascuna con:
-- tipo: Formale
-- tipo: Neutro
-- tipo: Confidente
-
-====================
-LINEE GUIDA IMPORTANTI
-====================
-- Mantieni massimo 300–400 parole per lettera
-- Evita frasi generiche o vaghe
-- Rispondi esclusivamente in JSON valido, senza markdown o testo extra
+Genera 3 varianti di lettera di presentazione (Formale, Neutro, Confidente).
+Massimo 300 parole ciascuna.
 
 ====================
 FORMATO JSON OBBLIGATORIO
 ====================
 [
-  {
-    "type": "Formale",
-    "letter": "Testo completo..."
-  },
-  {
-    "type": "Neutro",
-    "letter": "Testo completo..."
-  },
-  {
-    "type": "Confidente",
-    "letter": "Testo completo..."
-  }
+  { "type": "Formale", "letter": "..." },
+  { "type": "Neutro", "letter": "..." },
+  { "type": "Confidente", "letter": "..." }
 ]
 `;
 
@@ -98,37 +72,29 @@ FORMATO JSON OBBLIGATORIO
     try {
       variants = JSON.parse(text);
     } catch (e) {
-      // Fallback robusto se l'AI non restituisce un array JSON
       console.error("Errore parsing lettera:", e);
       variants = [{ type: tone || "Standard", letter: text }];
     }
 
-    res.json({ variants }); // Inviamo le varianti al frontend
+    res.json({ variants });
   } catch (error) {
     handleAIError(res, error, "Generazione Lettera");
   }
 };
 
 // ------------------------------------------------------------------
-// 2. UPLOAD CV (Prompt Aggiornato)
+// 2. UPLOAD CV
 // ------------------------------------------------------------------
 export const uploadCV = async (req, res) => {
   try {
     if (!req.file)
       return res.status(400).json({ error: "Nessun file caricato" });
 
-    // Estrazione testo preliminare per il prompt
-    const pdfData = await pdf(req.file.buffer);
-    const pdfText = pdfData.text.substring(0, 2000); // Primi 2000 caratteri per check veloce
-
-    // Salviamo prima nel DB
+    // Salviamo nel DB
     const result = await query(
       "UPDATE users SET cv_file = $1, cv_filename = $2 WHERE id = $3 RETURNING cv_filename",
       [req.file.buffer, req.file.originalname, req.user.id],
     );
-
-    // Analisi rapida AI (Opzionale, solo per feedback immediato)
-    // Nota: Il vero parsing avviene in 'extractCVData' o 'analyzeCV'
 
     res.json({
       message: "CV Caricato con successo",
@@ -142,7 +108,7 @@ export const uploadCV = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 3. ANALISI CV (Scoring & Feedback)
+// 3. ANALISI CV
 // ------------------------------------------------------------------
 export const analyzeCV = async (req, res) => {
   try {
@@ -156,37 +122,18 @@ export const analyzeCV = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Agisci come un Senior Recruiter e Career Advisor esperto in valutazione CV.
+    const prompt = `Analizza il CV.
+    Testo: ${pdfData.text.substring(0, 15000)}
 
-====================
-INPUT
-====================
-Testo CV estratto:
-${pdfData.text.substring(0, 15000)}
-
-====================
-COMPITO
-====================
-Analizza il CV del candidato e fornisci:
-1. **Score (0–100)**: completezza, chiarezza, ATS-friendly.
-2. **Summary**: sintesi professionale (2–4 frasi).
-3. **Strengths**: elenco punti di forza.
-4. **Improvements**: suggerimenti concreti.
-5. **Explainability**: breve spiegazione del punteggio.
-
-Rispondi in ITALIANO e SOLO JSON valido.
-
-====================
-FORMATO JSON OBBLIGATORIO
-====================
-{
-  "score": 0,
-  "summary": "",
-  "strengths": ["..."],
-  "improvements": ["..."],
-  "explainability": ""
-}
-`;
+    Output JSON richiesto:
+    {
+      "score": 0,
+      "summary": "...",
+      "strengths": ["..."],
+      "improvements": ["..."],
+      "explainability": "..."
+    }
+    `;
     const result = await model.generateContent(prompt);
     const text = result.response
       .text()
@@ -222,47 +169,30 @@ export const getScoreHistory = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 5. SCRAPE URL (Magic Scrape)
+// 5. SCRAPE URL
 // ------------------------------------------------------------------
 export const scrapeJob = async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL mancante" });
   try {
-    // Nota: Scraping diretto di pagine complesse spesso fallisce senza puppeteer.
-    // Qui assumiamo che fetch ritorni HTML leggibile.
     const response = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
     });
     const html = await response.text();
-
-    const cleanContent = html
-      .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/g, "")
-      .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/g, "")
-      .replace(/<[^>]+>/g, " ") // Rimuove tag HTML rimanenti
-      .substring(0, 15000);
+    const cleanContent = html.replace(/<[^>]+>/g, " ").substring(0, 15000);
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
     const result = await model.generateContent(
-      `Agisci come un parser professionale di annunci di lavoro.
-      
-      Estrai le informazioni da questo testo grezzo (HTML pulito):
+      `Estrai dati annuncio da questo testo:
       ${cleanContent}
 
-      Output JSON richiesto (in Italiano):
+      Output JSON:
       {
-        "company": "",
-        "position": "",
-        "job_description": "",
-        "location": "",
-        "employment_type": "",
-        "seniority": "",
-        "key_skills": [],
-        "requirements": [],
-        "benefits": []
-      }
-      `,
+        "company": "", "position": "", "job_description": "", "location": "",
+        "employment_type": "", "seniority": "", "key_skills": [], "requirements": [], "benefits": []
+      }`,
     );
 
     const text = result.response
@@ -297,25 +227,18 @@ export const getJobMatch = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Agisci come Senior Recruiter.
-    
-    Candidato:
-    Hard Skills: ${userRes.rows[0].hard_skills}
-    Soft Skills: ${userRes.rows[0].soft_skills}
+    const prompt = `Analizza Fit Candidato vs Job.
+    Skills: ${userRes.rows[0].hard_skills}, ${userRes.rows[0].soft_skills}
+    Job: ${jobRes.rows[0].job_description}
 
-    Job Description:
-    ${jobRes.rows[0].job_description}
-
-    Analizza il fit.
-    Output JSON (Italiano):
+    Output JSON:
     {
       "match_percentage": 0,
       "verdict": "Ottimo/Buono/Parziale/Scarso",
       "strengths": [],
       "missing_skills": [],
-      "cv_advice": "Consiglio breve"
-    }
-    `;
+      "cv_advice": "..."
+    }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
@@ -330,7 +253,8 @@ export const getJobMatch = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 7. EXTRACT CV DATA (Popolamento Profilo - SCHEMA CORRETTO PER IL FRONTEND)
+// 7. EXTRACT CV DATA (Popolamento Profilo)
+// ------------------------------------------------------------------
 export const extractCVData = async (req, res) => {
   try {
     const dbResult = await query("SELECT cv_file FROM users WHERE id = $1", [
@@ -343,62 +267,18 @@ export const extractCVData = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    // 🔥 FIX: Schema JSON allineato esattamente con i campi di Profile.jsx
-    const prompt = `Agisci come un Resume Parser per un sistema ATS. 
-    Estrai i dati da questo CV in Italiano.
-    
-    TESTO CV:
-    ${pdfData.text.substring(0, 25000)}
+    const prompt = `Estrai dati CV in JSON.
+    Testo: ${pdfData.text.substring(0, 25000)}
 
-    ====================
-    REGOLE DI ESTRAZIONE
-    ====================
-    1. Estrai SOLO ciò che è scritto. Non inventare.
-    2. Per le date, cerca di usare il formato YYYY-MM-DD. Se c'è solo l'anno, usa YYYY-01-01.
-    3. Se manca un dato, lascia stringa vuota "".
-
-    ====================
-    SCHEMA JSON OBBLIGATORIO (Rispetta le chiavi esatte)
-    ====================
-    Rispondi SOLO con un JSON valido:
+    JSON OBBLIGATORIO:
     {
-      "first_name": "Nome",
-      "last_name": "Cognome",
-      "phone": "Telefono",
-      "address": "Città/Indirizzo",
-      "email": "Email trovata nel cv (opzionale)",
-      "personal_description": "Breve riassunto professionale (max 300 caratteri)",
-      "hard_skills": "Lista skill tecniche separate da virgola",
-      "soft_skills": "Lista skill soft separate da virgola",
-      "socials": [
-         { "platform": "LinkedIn", "url": "..." },
-         { "platform": "GitHub", "url": "..." }
-      ],
-      "experiences": [
-        { 
-          "role": "Titolo Ruolo", 
-          "company": "Nome Azienda", 
-          "dateStart": "YYYY-MM-DD", 
-          "dateEnd": "YYYY-MM-DD", 
-          "current": false,
-          "description": "Elenco responsabilità"
-        }
-      ],
-      "education": [
-        { 
-          "degree": "Titolo (es. Diploma, Laurea Triennale)", 
-          "school": "Nome Istituto o Università", 
-          "city": "Città Istituto",
-          "dateStart": "YYYY-MM-DD",
-          "dateEnd": "YYYY-MM-DD", 
-          "description": "Voto o dettagli tesi"
-        }
-      ],
-      "certifications": [
-        { "name": "Nome Certificazione", "year": "Anno (YYYY)" }
-      ]
-    }
-    `;
+      "first_name": "", "last_name": "", "phone": "", "address": "", "email": "",
+      "personal_description": "", "hard_skills": "", "soft_skills": "",
+      "socials": [{ "platform": "", "url": "" }],
+      "experiences": [{ "role": "", "company": "", "dateStart": "", "dateEnd": "", "current": false, "description": "" }],
+      "education": [{ "degree": "", "school": "", "city": "", "dateStart": "", "dateEnd": "", "description": "" }],
+      "certifications": [{ "name": "", "year": "" }]
+    }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
@@ -412,12 +292,9 @@ export const extractCVData = async (req, res) => {
       extractedData = JSON.parse(text);
     } catch (e) {
       console.error("Errore parsing JSON AI:", e);
-      return res
-        .status(500)
-        .json({ error: "L'AI non ha generato un JSON valido. Riprova." });
+      return res.status(500).json({ error: "JSON invalido." });
     }
 
-    // Aggiornamento nel DB
     const updated = await query(
       `UPDATE users SET 
         first_name=COALESCE($1, first_name), 
@@ -427,10 +304,7 @@ export const extractCVData = async (req, res) => {
         personal_description=COALESCE($5, personal_description), 
         hard_skills=COALESCE($6, hard_skills), 
         soft_skills=COALESCE($7, soft_skills), 
-        experiences=$8, 
-        education=$9,
-        certifications=$10,
-        socials=$11
+        experiences=$8, education=$9, certifications=$10, socials=$11
        WHERE id=$12 RETURNING *`,
       [
         extractedData.first_name,
@@ -441,7 +315,7 @@ export const extractCVData = async (req, res) => {
         extractedData.hard_skills,
         extractedData.soft_skills,
         JSON.stringify(extractedData.experiences || []),
-        JSON.stringify(extractedData.education || []), // Ora le chiavi (school, degree) coincidono!
+        JSON.stringify(extractedData.education || []),
         JSON.stringify(extractedData.certifications || []),
         JSON.stringify(extractedData.socials || []),
         req.user.id,
@@ -449,18 +323,14 @@ export const extractCVData = async (req, res) => {
     );
 
     delete updated.rows[0].cv_file;
-    res.json({
-      message: "Profilo aggiornato con successo!",
-      user: updated.rows[0],
-    });
+    res.json({ message: "Profilo aggiornato!", user: updated.rows[0] });
   } catch (error) {
     handleAIError(res, error, "Estrazione Dati");
   }
 };
 
 // ------------------------------------------------------------------
-
-// 8. JOB FINDER REALE (JSearch + Gemini Analysis)
+// 8. JOB FINDER REALE
 // ------------------------------------------------------------------
 export const searchJobs = async (req, res) => {
   const {
@@ -471,25 +341,11 @@ export const searchJobs = async (req, res) => {
     jobType,
     experience,
   } = req.body;
-
   try {
     if (!process.env.RAPIDAPI_KEY)
-      return res.status(500).json({ error: "Chiave API mancante." });
+      return res.status(500).json({ error: "API Key mancante." });
 
-    // --- 1. Costruzione Query JSearch ---
-    let experienceKeyword = "";
-    if (experience === "entry") experienceKeyword = "Junior";
-    if (experience === "mid") experienceKeyword = "Mid Level";
-    if (experience === "senior") experienceKeyword = "Senior";
-
-    let employmentTypeParam = undefined;
-    if (jobType === "fulltime") employmentTypeParam = "FULLTIME";
-    if (jobType === "parttime") employmentTypeParam = "PARTTIME";
-    if (jobType === "contract") employmentTypeParam = "CONTRACTOR";
-    if (jobType === "intern") employmentTypeParam = "INTERN";
-
-    const finalQuery = `${experienceKeyword} ${searchTerms} in ${location}`;
-
+    const finalQuery = `${searchTerms} in ${location}`;
     const options = {
       method: "GET",
       url: "https://jsearch.p.rapidapi.com/search",
@@ -499,7 +355,6 @@ export const searchJobs = async (req, res) => {
         num_pages: "1",
         date_posted: datePosted || "month",
         country: "it",
-        ...(employmentTypeParam && { employment_types: employmentTypeParam }),
         ...(remoteOnly && { remote_jobs_only: "true" }),
       },
       headers: {
@@ -508,23 +363,15 @@ export const searchJobs = async (req, res) => {
       },
     };
 
-    console.log(`📡 JSearch: "${finalQuery}"`);
     const apiRes = await axios.request(options);
     const realJobs = apiRes.data.data;
-
     if (!realJobs || realJobs.length === 0) return res.json([]);
 
-    // --- 2. ANALISI AI (Gemini 2.5) ---
+    // AI Analysis (Gemini 2.5)
     const jobsToAnalyze = realJobs.slice(0, 6);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const userRes = await query("SELECT hard_skills FROM users WHERE id = $1", [
-      req.user.id,
-    ]);
-    const userSkills = userRes.rows[0]?.hard_skills || "General Skills";
-
-    // Prepariamo dati sintetici per l'AI per risparmiare token
     const jobsDataString = JSON.stringify(
       jobsToAnalyze.map((j) => ({
         id: j.job_id,
@@ -533,27 +380,11 @@ export const searchJobs = async (req, res) => {
       })),
     );
 
-    const prompt = `Agisci come Recruiter Senior.
+    const prompt = `Analizza jobs.
+    Offerte: ${jobsDataString}
     
-    CANDIDATO SKILLS: ${userSkills}
-
-    OFFERTE: ${jobsDataString}
-
-    Per OGNI offerta, calcola Match Score (0-100) e analizza skills.
-    
-    Output JSON Array OBBLIGATORIO:
-    [
-      {
-        "id": "job_id_copiato_da_input",
-        "matchScore": 0,
-        "hard_skills_found": ["A", "B"],
-        "hard_skills_missing": ["C"],
-        "soft_skills_found": ["D"],
-        "soft_skills_missing": ["E"],
-        "explainability": "Motivo del match in 1 frase"
-      }
-    ]
-    `;
+    Output JSON Array:
+    [{ "id": "...", "matchScore": 0, "hard_skills_found": [], "hard_skills_missing": [], "soft_skills_found": [], "soft_skills_missing": [], "explainability": "..." }]`;
 
     const aiResult = await model.generateContent(prompt);
     const aiText = aiResult.response
@@ -561,68 +392,45 @@ export const searchJobs = async (req, res) => {
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
-
     let aiAnalysis = [];
     try {
       aiAnalysis = JSON.parse(aiText);
-    } catch (e) {
-      console.error("Errore JSON AI Search", e);
-    }
+    } catch (e) {}
 
-    // --- 3. MERGE DATI REALI + AI ---
     const finalResults = jobsToAnalyze.map((job) => {
-      const analysis = aiAnalysis.find((a) => a.id === job.job_id) || {
-        matchScore: 0,
-        hard_skills_found: [],
-        soft_skills_found: [],
-        hard_skills_missing: [],
-        soft_skills_missing: [],
-        explainability: "Analisi non disponibile",
-      };
-
-      // Uniamo gli array per compatibilità col frontend
-      const skillsFound = [
-        ...(analysis.hard_skills_found || []),
-        ...(analysis.soft_skills_found || []),
-      ];
-      const skillsMissing = [
-        ...(analysis.hard_skills_missing || []),
-        ...(analysis.soft_skills_missing || []),
-      ];
-
+      const analysis = aiAnalysis.find((a) => a.id === job.job_id) || {};
       return {
         id: job.job_id,
         title: job.job_title,
         company: job.employer_name,
-        location: job.job_city
-          ? `${job.job_city}, ${job.job_country}`
-          : "Remoto",
-        type: job.job_employment_type || "Full-time",
-        logo: job.employer_logo || null,
+        location: job.job_city || "Remoto",
+        type: job.job_employment_type,
+        logo: job.employer_logo,
         description: job.job_description,
-        link: job.job_apply_link || job.job_google_link || "#",
-
-        // Dati AI Arricchiti
-        matchScore: analysis.matchScore,
-        skills_found: skillsFound,
-        skills_missing: skillsMissing,
-        explainability: analysis.explainability,
+        link: job.job_apply_link,
+        matchScore: analysis.matchScore || 0,
+        skills_found: [
+          ...(analysis.hard_skills_found || []),
+          ...(analysis.soft_skills_found || []),
+        ],
+        skills_missing: [
+          ...(analysis.hard_skills_missing || []),
+          ...(analysis.soft_skills_missing || []),
+        ],
+        explainability: analysis.explainability || "N/A",
       };
     });
 
     res.json(finalResults);
   } catch (error) {
-    if (error.response) {
-      // Gestione errori specifica API JSearch
-      if (error.response.status === 429)
-        return res.status(429).json({ error: "Limit API JSearch raggiunto." });
-    }
+    if (error.response?.status === 429)
+      return res.status(429).json({ error: "Limit API JSearch." });
     handleAIError(res, error, "Job Search");
   }
 };
 
 // ------------------------------------------------------------------
-// 9. ICEBREAKER GENERATOR (Messaggi LinkedIn)
+// 9. ICEBREAKER
 // ------------------------------------------------------------------
 export const generateIcebreaker = async (req, res) => {
   const { company, position, keywords } = req.body;
@@ -630,15 +438,9 @@ export const generateIcebreaker = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `Genera 3 messaggi LinkedIn (max 300 char) per candidarsi.
+    const prompt = `Genera 3 messaggi LinkedIn.
     Ruolo: ${position} @ ${company}. Keywords: ${keywords}.
-    
-    Output JSON Array:
-    [
-      { "type": "Formale", "text": "..." },
-      { "type": "Appassionato", "text": "..." },
-      { "type": "Smart/Skill", "text": "..." }
-    ]`;
+    Output JSON: [{ "type": "", "text": "" }]`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
@@ -653,37 +455,25 @@ export const generateIcebreaker = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 10. AI RESUME TAILORING (Riscittura CV)
+// 10. CV TAILORING
 // ------------------------------------------------------------------
 export const tailorCV = async (req, res) => {
   const { jobDescription } = req.body;
   try {
-    const userId = req.user.id;
     const dbResult = await query("SELECT cv_file FROM users WHERE id = $1", [
-      userId,
+      req.user.id,
     ]);
-
-    if (!dbResult.rows[0]?.cv_file) {
-      return res.status(400).json({ error: "Carica prima il tuo CV!" });
-    }
+    if (!dbResult.rows[0]?.cv_file)
+      return res.status(400).json({ error: "Carica CV!" });
 
     const pdfData = await pdf(dbResult.rows[0].cv_file);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const prompt = `CV Tailoring. Ottimizza il CV per l'offerta.
-    
+    const prompt = `Tailoring CV.
     CV: ${pdfData.text.substring(0, 5000)}
-    OFFERTA: ${jobDescription.substring(0, 5000)}
-
-    Output JSON (Italiano):
-    {
-      "optimized_summary": "Nuovo profilo professionale...",
-      "key_skills_to_add": ["Skill 1", "Skill 2"],
-      "experience_enhancements": [
-        { "role": "Role Title", "suggestion": "Come migliorare i bullet points..." }
-      ]
-    }`;
+    Job: ${jobDescription.substring(0, 5000)}
+    Output JSON: { "optimized_summary": "...", "key_skills_to_add": [], "experience_enhancements": [] }`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
@@ -698,7 +488,7 @@ export const tailorCV = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 11. SMART FOLLOW-UP EMAIL
+// 11. FOLLOW-UP EMAIL
 // ------------------------------------------------------------------
 export const generateFollowUp = async (req, res) => {
   const { company, position, daysAgo } = req.body;
@@ -706,14 +496,9 @@ export const generateFollowUp = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const timeContext = daysAgo ? `${daysAgo} giorni fa` : "recentemente";
-
-    const prompt = `Scrivi 3 varianti di email di follow-up (Formale, Neutra, Confidente) per candidatura inviata ${timeContext}.
-    Ruolo: ${position} @ ${company}.
-    
-    Restituisci un JSON Array:
-    [{ "type": "Formale", "subject": "...", "body": "..." }, ...]
-    `;
+    const prompt = `Email Follow-up (Formale, Neutra, Confidente).
+    ${position} @ ${company}, ${daysAgo} giorni fa.
+    JSON: [{ "type": "", "subject": "", "body": "" }]`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
@@ -722,20 +507,16 @@ export const generateFollowUp = async (req, res) => {
       .replace(/```/g, "")
       .trim();
 
-    // Gestione formato: Se l'AI risponde con JSON array, estraiamo testo formattato
-    let variants = [];
     try {
-      variants = JSON.parse(text);
-      // Convertiamo in un'unica stringa leggibile per il frontend attuale
-      const formattedText = variants
+      const variants = JSON.parse(text);
+      const formatted = variants
         .map(
           (v) =>
             `=== ${v.type.toUpperCase()} ===\nOggetto: ${v.subject}\n\n${v.body}`,
         )
-        .join("\n\n-------------------\n\n");
-      res.json({ email: formattedText });
+        .join("\n\n---\n\n");
+      res.json({ email: formatted });
     } catch (e) {
-      // Fallback testo semplice
       res.json({ email: text });
     }
   } catch (error) {
@@ -744,7 +525,7 @@ export const generateFollowUp = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 12. INTERVIEW SIMULATOR (Nuovo con Scoring)
+// 12. INTERVIEW SIMULATOR
 // ------------------------------------------------------------------
 export const generateInterviewQuestions = async (req, res) => {
   const { company, position, jobDescription } = req.body;
@@ -752,27 +533,8 @@ export const generateInterviewQuestions = async (req, res) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const context = jobDescription
-      ? jobDescription.substring(0, 3000)
-      : "Standard role requirements";
-
-    const prompt = `Simula un colloquio per ${position} @ ${company}.
-    Contesto: ${context}
-
-    Genera 3 domande (Tecnica, Comportamentale, Situazionale).
-    
-    Output JSON Array OBBLIGATORIO:
-    [
-      {
-        "type": "Tecnica",
-        "question": "...",
-        "follow_up_question": "...",
-        "recruiter_intent": "...",
-        "sample_answer": "...",
-        "scoring_criteria": { "1": "Bad", "3": "Avg", "5": "Good" }
-      },
-      ...
-    ]`;
+    const prompt = `Simula colloquio ${position} @ ${company}.
+    Output JSON: [{ "type": "", "question": "", "follow_up_question": "", "recruiter_intent": "", "sample_answer": "", "scoring_criteria": {} }]`;
 
     const result = await model.generateContent(prompt);
     const text = result.response
