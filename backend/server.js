@@ -78,9 +78,46 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/coach", coachRoutes);
 
 // ==========================================
-// 🛠️ SETUP DATABASE (SOLO PER PRIMO AVVIO)
+// 🛠️ FIX DATABASE AL VOLO (AGGIUNTA COLONNE MANCANTI)
 // ==========================================
-// Visita questa rotta una volta deployato per creare le tabelle!
+// Esegui questa rotta UNA VOLTA per aggiornare il DB senza cancellare dati
+app.get("/fix-db", async (req, res) => {
+  try {
+    console.log("🛠️ Inizio aggiornamento schema database...");
+
+    // 1. Aggiunge colonna job_link (per Estensione Chrome)
+    await query(
+      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS job_link TEXT",
+    );
+
+    // 2. Aggiunge colonna company_logo (per UI migliore)
+    await query(
+      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS company_logo TEXT",
+    );
+
+    // 3. Crea la tabella cv_history se manca (serve per l'AI analysis)
+    await query(`
+      CREATE TABLE IF NOT EXISTS cv_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("✅ Database aggiornato con successo.");
+    res.send(
+      "✅ Database fixato! Colonne 'job_link' e 'company_logo' aggiunte. Tabella 'cv_history' verificata.",
+    );
+  } catch (error) {
+    console.error("❌ Errore fix db:", error);
+    res.status(500).send("Errore fix db: " + error.message);
+  }
+});
+
+// ==========================================
+// 🛠️ SETUP DATABASE (SOLO PER NUOVE INSTALLAZIONI)
+// ==========================================
 app.get("/setup-db", async (req, res) => {
   try {
     // 1. Tabella Utenti
@@ -107,7 +144,7 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
-    // 2. Tabella Job Applications
+    // 2. Tabella Job Applications (Aggiornata con nuove colonne)
     await query(`
       CREATE TABLE IF NOT EXISTS job_applications (
         id SERIAL PRIMARY KEY,
@@ -115,6 +152,8 @@ app.get("/setup-db", async (req, res) => {
         company VARCHAR(150) NOT NULL,
         position VARCHAR(150) NOT NULL,
         job_description TEXT,
+        job_link TEXT,           -- NUOVO
+        company_logo TEXT,       -- NUOVO
         status VARCHAR(50) DEFAULT 'WISH',
         match_score INTEGER,
         analysis_results JSONB,
@@ -138,8 +177,18 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
+    // 4. Tabella CV History (Nuova)
+    await query(`
+      CREATE TABLE IF NOT EXISTS cv_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     res.send(
-      "✅ Database configurato con successo! Tabelle create (se non esistevano).",
+      "✅ Database configurato con successo! Tutte le tabelle sono pronte.",
     );
   } catch (error) {
     console.error(error);
