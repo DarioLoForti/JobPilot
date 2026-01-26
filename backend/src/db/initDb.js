@@ -49,15 +49,18 @@ const initDb = async () => {
       );
     `);
 
-    // 3. Crea tabella JOBS (Aggiornata con job_description)
+    // 3. Crea tabella JOBS (Aggiornata per testi lunghi)
     await query(`
       CREATE TABLE IF NOT EXISTS job_applications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         company VARCHAR(255) NOT NULL,
         position VARCHAR(255) NOT NULL,
-        job_link VARCHAR(500),
+        
+        -- 🔥 MODIFICA CRUCIALE: VARCHAR(500) -> TEXT per evitare errori di lunghezza
+        job_link TEXT, 
         job_description TEXT, -- ✨ Fondamentale per il confronto AI
+        
         status VARCHAR(50) DEFAULT 'applied',
         interview_date TIMESTAMP WITH TIME ZONE,
         notes TEXT,
@@ -93,7 +96,7 @@ const initDb = async () => {
     `);
 
     console.log(
-      "✅ Database pronto: Tabelle Users, Jobs, History e Assessments create con successo.",
+      "✅ Database pronto: Tabelle ricreate con colonne TEXT (nessun limite di lunghezza).",
     );
     process.exit(0);
   } catch (error) {

@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
 
 export default function Navbar({ mode, toggleMode }) {
   const navigate = useNavigate();
+  const location = useLocation(); 
   const token = localStorage.getItem('token');
   const [isOpen, setIsOpen] = useState(false);
+
+  const hideOnPaths = ['/', '/login', '/register'];
+  if (hideOnPaths.includes(location.pathname)) {
+    return null;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -22,7 +29,6 @@ export default function Navbar({ mode, toggleMode }) {
     navigate(path);
   };
 
-  // Classi CSS dinamiche
   const navLink = "text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors cursor-pointer";
   const mobileLink = "block w-full text-left px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg";
   const btnPrimary = "bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-blue-500/30 transition-transform active:scale-95";
@@ -32,7 +38,6 @@ export default function Navbar({ mode, toggleMode }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           
-          {/* LOGO */}
           <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => handleNav(token ? '/dashboard' : '/')}>
             <span className="text-2xl">✈️</span>
             <span className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-cyan-500 dark:from-blue-400 dark:to-cyan-300">
@@ -40,7 +45,6 @@ export default function Navbar({ mode, toggleMode }) {
             </span>
           </div>
 
-          {/* MENU DESKTOP */}
           <div className="hidden md:flex items-center gap-8">
             <button onClick={toggleMode} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
               {mode === 'dark' ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
@@ -50,8 +54,13 @@ export default function Navbar({ mode, toggleMode }) {
                 <>
                     <button onClick={() => handleNav('/dashboard')} className={navLink}>Dashboard</button>
                     <button onClick={() => handleNav('/jobs')} className={navLink}>Jobs</button>
+                    <button onClick={() => handleNav('/finder')} className={`${navLink} flex items-center gap-1 text-blue-600 dark:text-cyan-400`}>
+                        <SearchIcon fontSize="small"/> Cerca
+                    </button>
                     <button onClick={() => handleNav('/coach')} className={navLink}>Coach</button>
                     <button onClick={() => handleNav('/profile')} className={navLink}>Profilo</button>
+                    <button onClick={() => handleNav('/settings')} className={navLink}>Impostazioni</button> {/* <--- NUOVO LINK */}
+                    
                     <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-2"></div>
                     <button onClick={handleLogout} className="text-sm font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">Esci</button>
                 </>
@@ -63,7 +72,6 @@ export default function Navbar({ mode, toggleMode }) {
             )}
           </div>
 
-          {/* HAMBURGER MOBILE */}
           <div className="md:hidden flex items-center gap-4">
             <button onClick={toggleMode} className="p-2 text-slate-600 dark:text-slate-400">
                 {mode === 'dark' ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
@@ -75,15 +83,16 @@ export default function Navbar({ mode, toggleMode }) {
         </div>
       </div>
 
-      {/* MOBILE MENU */}
       {isOpen && (
         <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] absolute w-full left-0 px-4 py-4 shadow-xl flex flex-col gap-2">
             {token ? (
                 <>
                     <button onClick={() => handleNav('/dashboard')} className={mobileLink}>📊 Dashboard</button>
                     <button onClick={() => handleNav('/jobs')} className={mobileLink}>📋 Jobs</button>
+                    <button onClick={() => handleNav('/finder')} className={`${mobileLink} bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300`}>🔍 Cerca con AI</button>
                     <button onClick={() => handleNav('/coach')} className={mobileLink}>🧠 Coach</button>
                     <button onClick={() => handleNav('/profile')} className={mobileLink}>👤 Profilo</button>
+                    <button onClick={() => handleNav('/settings')} className={mobileLink}>⚙️ Impostazioni</button> {/* <--- NUOVO LINK */}
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                     <button onClick={handleLogout} className={`${mobileLink} text-red-600 dark:text-red-400`}>🚪 Logout</button>
                 </>

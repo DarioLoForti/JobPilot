@@ -2,13 +2,15 @@ import express from "express";
 import {
   getUserProfile,
   updateUserProfile,
-  getProfileImage, // <--- Importiamo la nuova funzione
+  getUserProfileImage, // Nome corretto della funzione nel controller
   upload,
+  deleteAccount, // <--- Funzione per eliminare l'account
 } from "../controllers/userController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+// 1. Profilo Utente (Lettura e Modifica)
 router.get("/profile", protect, getUserProfile);
 router.put(
   "/profile",
@@ -17,7 +19,10 @@ router.put(
   updateUserProfile,
 );
 
-// Nuova rotta per vedere l'immagine: /api/users/profile/image
-router.get("/profile/image", protect, getProfileImage);
+// 2. Recupero Immagine Profilo
+router.get("/profile/image", protect, getUserProfileImage);
+
+// 3. 🛑 CANCELLAZIONE ACCOUNT (GDPR)
+router.delete("/me", protect, deleteAccount);
 
 export default router;

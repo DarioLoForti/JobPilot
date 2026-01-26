@@ -11,7 +11,10 @@ import Jobs from './pages/Jobs';
 import Profile from './pages/Profile';
 import Landing from './pages/Landing';
 import Coach from './pages/Coach';
+import JobFinder from './pages/JobFinder';
+import Settings from './pages/Settings'; // <--- IMPORT NUOVO (Pagina Impostazioni)
 import Navbar from './components/Navbar';
+import CookieBanner from './components/CookieBanner';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -37,7 +40,7 @@ function App() {
         mode,
         primary: { main: '#2563eb' },
         background: { 
-            default: mode === 'dark' ? '#0f172a' : '#f1f5f9', // Slate-100 per Light Mode
+            default: mode === 'dark' ? '#0f172a' : '#f1f5f9', 
             paper: mode === 'dark' ? '#1e293b' : '#ffffff' 
         },
         text: {
@@ -58,7 +61,6 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        {/* SFONDO GLOBALE: bg-slate-100 (Grigio Chiaro) vs bg-[#0f172a] (Dark) */}
         <div className="min-h-screen bg-slate-100 dark:bg-[#0f172a] text-slate-900 dark:text-slate-100 transition-colors duration-300 relative">
             
             <div className={`fixed inset-0 z-0 pointer-events-none transition-opacity duration-500 ${mode === 'dark' ? 'opacity-100' : 'opacity-0'}`}>
@@ -75,12 +77,18 @@ function App() {
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
+                    <Route path="/finder" element={<ProtectedRoute><JobFinder /></ProtectedRoute>} />
                     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} /> {/* <--- NUOVA ROTTA */}
+                    
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+
+                <CookieBanner /> 
             </div>
         </div>
       </Router>

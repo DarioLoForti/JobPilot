@@ -8,6 +8,11 @@ import {
   getJobMatch,
   uploadCV,
   extractCVData,
+  searchJobs,
+  generateIcebreaker,
+  tailorCV,
+  generateFollowUp,
+  generateInterviewQuestions,
 } from "../controllers/aiController.js";
 import { auth } from "../middleware/auth.js";
 
@@ -18,12 +23,17 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 // ROTTE PROTETTE
-router.post("/upload-cv", auth, upload.single("cv"), uploadCV); // <--- QUESTA ERA SPARITA
+router.post("/upload-cv", auth, upload.single("cv"), uploadCV);
 router.post("/analyze-cv", auth, analyzeCV);
 router.post("/generate", auth, generateCoverLetter);
 router.post("/scrape-job", auth, scrapeJob);
 router.post("/extract-profile", auth, extractCVData);
 router.get("/history", auth, getScoreHistory);
 router.get("/match/:jobId", auth, getJobMatch);
+router.post("/job-search", auth, searchJobs);
+router.post("/icebreaker", auth, generateIcebreaker);
+router.post("/tailor-cv", auth, tailorCV);
+router.post("/follow-up", auth, generateFollowUp);
+router.post("/interview-prep", auth, generateInterviewQuestions);
 
 export default router;

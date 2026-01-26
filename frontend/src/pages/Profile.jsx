@@ -7,7 +7,6 @@ import {
 } from '@mui/material';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import MyDocument from '../components/CVDocument';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import PersonIcon from '@mui/icons-material/Person';
@@ -15,11 +14,8 @@ import SchoolIcon from '@mui/icons-material/School';
 import WorkIcon from '@mui/icons-material/Work';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import StarsIcon from '@mui/icons-material/Stars';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload'; // Rimane per l'immagine profilo
 import toast from 'react-hot-toast';
 
 const DEGREES = ["Diploma di Maturità", "Laurea Triennale", "Laurea Magistrale", "Master", "Dottorato", "Altro"];
@@ -31,7 +27,6 @@ const MENU_ITEMS = [
     { id: 2, label: "Lavoro", icon: <WorkIcon fontSize="small" /> },
     { id: 3, label: "Studi", icon: <SchoolIcon fontSize="small" /> },
     { id: 4, label: "Cert", icon: <StarsIcon fontSize="small" /> },
-    { id: 5, label: "AI", icon: <AutoFixHighIcon fontSize="small" /> }
 ];
 
 export default function Profile() {
@@ -42,10 +37,6 @@ export default function Profile() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [imgKey, setImgKey] = useState(Date.now());
-
-  const [analyzing, setAnalyzing] = useState(false);
-  const [extracting, setExtracting] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
 
   const [formData, setFormData] = useState({ 
     first_name: '', last_name: '', email: '', phone: '', address: '',
@@ -131,61 +122,6 @@ export default function Profile() {
         setImgKey(Date.now());
         setPreviewUrl(null); setSelectedFile(null);
     }
-  };
-
-  const handleCvUpload = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.type !== 'application/pdf') return toast.error("Carica solo file PDF");
-      const token = localStorage.getItem('token');
-      const data = new FormData();
-      data.append('cv', file);
-      
-      const uploadRequest = fetch('/api/ai/upload-cv', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: data });
-      
-      await toast.promise(uploadRequest, { loading: 'Caricamento CV...', success: 'File caricato con successo!', error: 'Errore durante l\'upload' });
-
-      const res = await uploadRequest;
-      if (res.ok) {
-        const result = await res.json();
-        setFormData(prev => ({ ...prev, cv_filename: result.filename }));
-      }
-  };
-
-  const handleAnalyze = async () => {
-      setAnalyzing(true);
-      const token = localStorage.getItem('token');
-      try {
-          const res = await fetch('/api/ai/analyze-cv', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.ok) {
-              const data = await res.json();
-              setAnalysisResult(data);
-              toast.success("Analisi AI completata!");
-          } else {
-              const err = await res.json();
-              toast.error(err.error || "Errore durante l'analisi");
-          }
-      } catch (e) { toast.error("Errore di connessione al server"); }
-      finally { setAnalyzing(false); }
-  };
-
-  const handleExtractData = async () => {
-      setExtracting(true);
-      const token = localStorage.getItem('token');
-      try {
-          const res = await fetch('/api/ai/extract-profile', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.ok) {
-              const result = await res.json();
-              setUser(result.user);
-              syncFormData(result.user); 
-              toast.success("Magia! Profilo compilato dai dati del CV ✨");
-              setActiveTab(0); 
-          } else {
-              const err = await res.json();
-              toast.error(err.error || "Impossibile estrarre i dati");
-          }
-      } catch (e) { toast.error("Errore durante l'estrazione intelligente"); } 
-      finally { setExtracting(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><CircularProgress /></div>;
@@ -285,14 +221,14 @@ export default function Profile() {
                                 
                                 {formData.socials.map((soc, index) => (
                                     <div key={index} className="flex flex-col md:flex-row gap-3 mb-4 bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10 relative w-full">
-                                        <FormControl size="small" className="input-glass w-full md:w-48">
-                                            <InputLabel className="text-slate-500 dark:text-slate-400">Piattaforma</InputLabel>
-                                            <Select value={soc.platform} label="Piattaforma" onChange={e => handleArrayChange(index, 'platform', e.target.value, 'socials')} className="text-slate-900 dark:text-white">
-                                                {SOCIAL_PLATFORMS.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
-                                            </Select>
-                                        </FormControl>
-                                        <TextField label="URL Profilo" size="small" fullWidth value={soc.url} onChange={e => handleArrayChange(index, 'url', e.target.value, 'socials')} className="input-glass" />
-                                        <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end md:self-auto" onClick={() => removeItem(index, 'socials')}><DeleteIcon fontSize="small" /></IconButton>
+                                            <FormControl size="small" className="input-glass w-full md:w-48">
+                                                <InputLabel className="text-slate-500 dark:text-slate-400">Piattaforma</InputLabel>
+                                                <Select value={soc.platform} label="Piattaforma" onChange={e => handleArrayChange(index, 'platform', e.target.value, 'socials')} className="text-slate-900 dark:text-white">
+                                                    {SOCIAL_PLATFORMS.map(p => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+                                                </Select>
+                                            </FormControl>
+                                            <TextField label="URL Profilo" size="small" fullWidth value={soc.url} onChange={e => handleArrayChange(index, 'url', e.target.value, 'socials')} className="input-glass" />
+                                            <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end md:self-auto" onClick={() => removeItem(index, 'socials')}><DeleteIcon fontSize="small" /></IconButton>
                                     </div>
                                 ))}
                             </div>
@@ -323,17 +259,17 @@ export default function Profile() {
                                 </div>
                                 {formData.experiences.map((exp, index) => (
                                     <div key={index} className="border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4 md:p-5 rounded-2xl mb-4 relative hover:bg-slate-100 dark:hover:bg-white/10 transition-colors w-full">
-                                        <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'experiences')}><DeleteIcon fontSize="small" /></IconButton>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                                            <TextField label="Ruolo" size="small" fullWidth value={exp.role} onChange={e => handleArrayChange(index, 'role', e.target.value, 'experiences')} className="input-glass" />
-                                            <TextField label="Azienda" size="small" fullWidth value={exp.company} onChange={e => handleArrayChange(index, 'company', e.target.value, 'experiences')} className="input-glass" />
-                                            <div className="grid grid-cols-2 gap-2 md:col-span-2">
-                                                <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'experiences')} className="input-glass" />
-                                                <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'experiences')} disabled={exp.current} className="input-glass" />
+                                            <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'experiences')}><DeleteIcon fontSize="small" /></IconButton>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                                <TextField label="Ruolo" size="small" fullWidth value={exp.role} onChange={e => handleArrayChange(index, 'role', e.target.value, 'experiences')} className="input-glass" />
+                                                <TextField label="Azienda" size="small" fullWidth value={exp.company} onChange={e => handleArrayChange(index, 'company', e.target.value, 'experiences')} className="input-glass" />
+                                                <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                                    <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'experiences')} className="input-glass" />
+                                                    <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={exp.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'experiences')} disabled={exp.current} className="input-glass" />
+                                                </div>
+                                                <FormControlLabel control={<Checkbox checked={exp.current || false} onChange={e => handleArrayChange(index, 'current', e.target.checked, 'experiences')} sx={{ color: '#94a3b8', '&.Mui-checked': { color: '#22d3ee' } }} />} label={<Typography variant="caption" className="font-bold text-slate-500 dark:text-slate-300">Lavoro attuale</Typography>} className="md:col-span-2" />
+                                                <TextField label="Descrizione" multiline rows={3} fullWidth size="small" value={exp.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'experiences')} className="input-glass md:col-span-2" />
                                             </div>
-                                            <FormControlLabel control={<Checkbox checked={exp.current || false} onChange={e => handleArrayChange(index, 'current', e.target.checked, 'experiences')} sx={{ color: '#94a3b8', '&.Mui-checked': { color: '#22d3ee' } }} />} label={<Typography variant="caption" className="font-bold text-slate-500 dark:text-slate-300">Lavoro attuale</Typography>} className="md:col-span-2" />
-                                            <TextField label="Descrizione" multiline rows={3} fullWidth size="small" value={exp.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'experiences')} className="input-glass md:col-span-2" />
-                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -347,22 +283,22 @@ export default function Profile() {
                                 </div>
                                 {formData.education.map((edu, index) => (
                                     <div key={index} className="border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-4 md:p-5 rounded-2xl mb-4 relative hover:bg-slate-100 dark:hover:bg-white/10 transition-colors w-full">
-                                        <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'education')}><DeleteIcon fontSize="small" /></IconButton>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                                            <FormControl fullWidth size="small" className="input-glass">
-                                                <InputLabel className="text-slate-500 dark:text-slate-400">Titolo</InputLabel>
-                                                <Select value={DEGREES.includes(edu.degree) ? edu.degree : ''} label="Titolo" onChange={e => handleArrayChange(index, 'degree', e.target.value, 'education')} className="text-slate-900 dark:text-white">
-                                                    {DEGREES.map((deg) => <MenuItem key={deg} value={deg}>{deg}</MenuItem>)}
-                                                </Select>
-                                            </FormControl>
-                                            <TextField label="Istituto" size="small" fullWidth value={edu.school} onChange={e => handleArrayChange(index, 'school', e.target.value, 'education')} className="input-glass" />
-                                            <TextField label="Città" size="small" fullWidth value={edu.city} onChange={e => handleArrayChange(index, 'city', e.target.value, 'education')} className="input-glass" />
-                                            <div className="grid grid-cols-2 gap-2 md:col-span-2">
-                                                <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'education')} className="input-glass" />
-                                                <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'education')} className="input-glass" />
+                                            <IconButton size="small" className="absolute top-2 right-2 text-slate-500 hover:text-red-500" onClick={() => removeItem(index, 'education')}><DeleteIcon fontSize="small" /></IconButton>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                                <FormControl fullWidth size="small" className="input-glass">
+                                                    <InputLabel className="text-slate-500 dark:text-slate-400">Titolo</InputLabel>
+                                                    <Select value={DEGREES.includes(edu.degree) ? edu.degree : ''} label="Titolo" onChange={e => handleArrayChange(index, 'degree', e.target.value, 'education')} className="text-slate-900 dark:text-white">
+                                                        {DEGREES.map((deg) => <MenuItem key={deg} value={deg}>{deg}</MenuItem>)}
+                                                    </Select>
+                                                </FormControl>
+                                                <TextField label="Istituto" size="small" fullWidth value={edu.school} onChange={e => handleArrayChange(index, 'school', e.target.value, 'education')} className="input-glass" />
+                                                <TextField label="Città" size="small" fullWidth value={edu.city} onChange={e => handleArrayChange(index, 'city', e.target.value, 'education')} className="input-glass" />
+                                                <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                                                    <TextField type="date" label="Inizio" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateStart} onChange={e => handleArrayChange(index, 'dateStart', e.target.value, 'education')} className="input-glass" />
+                                                    <TextField type="date" label="Fine" size="small" InputLabelProps={{shrink: true}} fullWidth value={edu.dateEnd} onChange={e => handleArrayChange(index, 'dateEnd', e.target.value, 'education')} className="input-glass" />
+                                                </div>
+                                                <TextField label="Tesi / Dettagli" multiline rows={2} fullWidth size="small" value={edu.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'education')} className="input-glass md:col-span-2" />
                                             </div>
-                                            <TextField label="Tesi / Dettagli" multiline rows={2} fullWidth size="small" value={edu.description} onChange={e => handleArrayChange(index, 'description', e.target.value, 'education')} className="input-glass md:col-span-2" />
-                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -376,81 +312,19 @@ export default function Profile() {
                                 </div>
                                 {formData.certifications.map((cert, index) => (
                                     <div key={index} className="flex flex-col md:flex-row gap-3 mb-4 bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-200 dark:border-white/10 relative w-full">
-                                        <TextField label="Nome Certificazione" fullWidth size="small" value={cert.name} onChange={e => handleArrayChange(index, 'name', e.target.value, 'certifications')} className="input-glass" />
-                                        <TextField label="Anno" size="small" placeholder="YYYY" value={cert.year} onChange={e => handleArrayChange(index, 'year', e.target.value, 'certifications')} className="input-glass w-full md:w-32" />
-                                        <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end" onClick={() => removeItem(index, 'certifications')}><DeleteIcon fontSize="small" /></IconButton>
+                                            <TextField label="Nome Certificazione" fullWidth size="small" value={cert.name} onChange={e => handleArrayChange(index, 'name', e.target.value, 'certifications')} className="input-glass" />
+                                            <TextField label="Anno" size="small" placeholder="YYYY" value={cert.year} onChange={e => handleArrayChange(index, 'year', e.target.value, 'certifications')} className="input-glass w-full md:w-32" />
+                                            <IconButton size="small" className="text-red-500 dark:text-red-400 md:absolute md:right-2 md:top-3 self-end" onClick={() => removeItem(index, 'certifications')}><DeleteIcon fontSize="small" /></IconButton>
                                     </div>
                                 ))}
-                            </div>
-                        )}
-
-                        {activeTab === 5 && (
-                            <div className="space-y-8 text-center w-full">
-                                <div className="p-6 md:p-10 border-2 border-dashed border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem]">
-                                    <AutoFixHighIcon className="text-indigo-500 dark:text-indigo-400 text-6xl md:text-7xl mb-4 filter drop-shadow-lg" />
-                                    <Typography variant="h4" className="font-black text-slate-800 dark:text-white mb-2">AI Optimization</Typography>
-                                    <Typography className="text-slate-500 dark:text-slate-400 mb-8 max-w-lg mx-auto text-sm md:text-base">Carica il tuo CV PDF. L'AI estrarrà i dati per compilare il profilo o analizzerà la qualità.</Typography>
-                                    
-                                    {formData.cv_filename && (
-                                        <div className="mb-8 inline-flex items-center gap-3 bg-white/80 dark:bg-black/30 px-4 py-2 rounded-full border border-slate-200 dark:border-white/10 shadow-lg max-w-full overflow-hidden">
-                                            <PictureAsPdfIcon className="text-red-500 shrink-0" />
-                                            <Typography className="font-bold text-slate-700 dark:text-slate-200 truncate text-sm">{formData.cv_filename}</Typography>
-                                            <CheckCircleIcon className="text-emerald-500 ml-2 shrink-0" fontSize="small" />
-                                        </div>
-                                    )}
-
-                                    <div className="flex flex-col gap-4 max-w-sm mx-auto w-full">
-                                        <Button variant="outlined" component="label" className="border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-white hover:text-slate-800 dark:hover:text-white py-3 rounded-xl font-bold w-full" startIcon={<CloudUploadIcon />}>
-                                            {formData.cv_filename ? "Sostituisci PDF" : "Carica PDF"}
-                                            <input type="file" hidden accept="application/pdf" onChange={handleCvUpload} />
-                                        </Button>
-                                        
-                                        <Button variant="contained" className="btn-neon py-3 rounded-xl w-full" onClick={handleExtractData} disabled={extracting || !formData.cv_filename} startIcon={extracting ? <CircularProgress size={20} color="inherit"/> : <AutoAwesomeIcon />}>
-                                            {extracting ? "Analisi..." : "Auto-Compila"}
-                                        </Button>
-
-                                        <Button variant="contained" className="bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl font-bold w-full" onClick={handleAnalyze} disabled={analyzing || !formData.cv_filename} startIcon={analyzing ? <CircularProgress size={20} color="inherit"/> : <AutoFixHighIcon />}>
-                                            {analyzing ? "Analisi..." : "Quality Check"}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {analysisResult && (
-                                    <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-cyan-500 mt-8 text-left w-full">
-                                        <div className="flex flex-col md:flex-row items-center gap-6 mb-8 p-6 bg-slate-50 dark:bg-black/20 rounded-3xl border border-slate-200 dark:border-white/5">
-                                            <div className="relative inline-flex">
-                                                <CircularProgress variant="determinate" value={analysisResult.score} size={80} thickness={4} sx={{ color: analysisResult.score > 70 ? '#10b981' : '#f59e0b' }} />
-                                                <Box sx={{ top: 0, left: 0, bottom: 0, right: 0, position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Typography variant="h5" className="font-black text-slate-800 dark:text-white">{analysisResult.score}</Typography>
-                                                </Box>
-                                            </div>
-                                            <div className="text-center md:text-left">
-                                                <Typography variant="h5" className="font-black text-slate-800 dark:text-white">CV Score</Typography>
-                                                <Typography className="text-slate-500 dark:text-slate-400 italic mt-1 text-sm">"{analysisResult.summary}"</Typography>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-6">
-                                            <div className="p-5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl">
-                                                <Typography className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-3"><CheckCircleIcon fontSize="small"/> Punti di Forza</Typography>
-                                                <List dense>{analysisResult.strengths.map((s,i) => <ListItem key={i} disablePadding className="mb-1"><ListItemIcon sx={{minWidth:28}}><CheckCircleIcon sx={{fontSize:16, color:'#10b981'}}/></ListItemIcon><ListItemText primary={s} className="text-slate-600 dark:text-slate-300" primaryTypographyProps={{fontSize:13}}/></ListItem>)}</List>
-                                            </div>
-                                            <div className="p-5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl">
-                                                <Typography className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-3"><WarningIcon fontSize="small"/> Miglioramenti</Typography>
-                                                <List dense>{analysisResult.improvements.map((s,i) => <ListItem key={i} disablePadding className="mb-1"><ListItemIcon sx={{minWidth:28}}><WarningIcon sx={{fontSize:16, color:'#f59e0b'}}/></ListItemIcon><ListItemText primary={s} className="text-slate-600 dark:text-slate-300" primaryTypographyProps={{fontSize:13}}/></ListItem>)}</List>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
                 </Fade>
 
-                {activeTab !== 5 && (
-                    <div className="mt-10 flex justify-end pt-6 border-t border-slate-200 dark:border-white/10 sticky bottom-0 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 -mx-4 md:-mx-10 -mb-4 md:-mb-10 rounded-b-[1.5rem] md:rounded-b-[2.5rem] z-20">
-                        <Button variant="contained" size="large" onClick={handleSave} className="btn-neon px-8 py-3 rounded-xl text-lg font-bold shadow-xl w-full md:w-auto">Salva Modifiche</Button>
-                    </div>
-                )}
+                <div className="mt-10 flex justify-end pt-6 border-t border-slate-200 dark:border-white/10 sticky bottom-0 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md p-4 -mx-4 md:-mx-10 -mb-4 md:-mb-10 rounded-b-[1.5rem] md:rounded-b-[2.5rem] z-20">
+                    <Button variant="contained" size="large" onClick={handleSave} className="btn-neon px-8 py-3 rounded-xl text-lg font-bold shadow-xl w-full md:w-auto">Salva Modifiche</Button>
+                </div>
 
             </div>
         </div>

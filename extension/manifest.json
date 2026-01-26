@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "JobPilot",
+  "version": "1.0",
+  "description": "Salva offerte di lavoro da LinkedIn e Indeed direttamente in JobPilot.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.linkedin.com/*", "*://*.indeed.com/*", "*://*.glassdoor.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
