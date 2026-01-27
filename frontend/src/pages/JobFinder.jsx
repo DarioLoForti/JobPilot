@@ -3,13 +3,13 @@ import {
   TextField, Button, Paper, Typography, 
   Chip, Slider, FormControlLabel, Switch, CircularProgress, 
   Box, Avatar, InputAdornment, Select, MenuItem, FormControl, InputLabel,
-  Autocomplete, Tooltip, Dialog, DialogTitle, DialogContent, IconButton
+  Autocomplete, Tooltip, Dialog, DialogContent, IconButton
 } from '@mui/material';
 import { 
   Search, LocationOn, Bolt, OpenInNew, 
-  CheckCircle, Cancel, WorkOutline, BookmarkBorder, 
+  Cancel, WorkOutline, BookmarkBorder, 
   LinkedIn, Google, Sort as SortIcon, Business, Public, Language,
-  Handshake, ContentCopy, Close
+  Handshake, ContentCopy, Close, Send
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 
@@ -84,11 +84,13 @@ export default function JobFinder() {
       if (res.ok) {
         const data = await res.json();
         setResults(data);
-        if(data.length > 0) toast.success(`${data.length} offerte analizzate!`);
-        else toast.error("Nessuna offerta trovata. Prova a cambiare filtri.");
+        if(data.length > 0) toast.success(`${data.length} offerte trovate!`);
+        else toast.error("Nessuna offerta trovata con questi filtri.");
       } else {
         const err = await res.json();
-        toast.error(err.error || "Errore ricerca.");
+        // Gestione specifica errore 429 (Limite API)
+        if (res.status === 429) toast.error("Limite ricerche giornaliero raggiunto. Riprova domani!");
+        else toast.error(err.error || "Errore ricerca.");
       }
     } catch (error) { toast.error("Errore di connessione."); } 
     finally { setLoading(false); }
@@ -97,16 +99,18 @@ export default function JobFinder() {
   const handleSaveJob = async (job) => {
     setSavingId(job.id);
     const token = localStorage.getItem('token');
-    const smartLink = generateSmartLink(job.title, job.company, 'linkedin');
-    const sourceInfo = getJobSource(job.link);
+    
+    // 🔥 USIAMO IL LINK REALE ORA!
+    const realLink = job.link || generateSmartLink(job.title, job.company, 'linkedin');
+    const sourceInfo = getJobSource(realLink);
 
     const jobData = {
         company: job.company,
         position: job.title,
-        job_link: smartLink,
-        job_description: job.description || "Descrizione importata da AI Search",
+        job_link: realLink, // Link Reale
+        job_description: job.description || "Descrizione importata da JSearch",
         status: 'wishlist',
-        notes: `Compatibilità AI: ${job.matchScore}%\nFonte: ${sourceInfo.name}\nLink Originale: ${job.link}`
+        notes: `Compatibilità AI: ${job.matchScore}%\nFonte: ${sourceInfo.name}\nMotivo Match: ${job.explainability || "N/A"}`
     };
 
     try {
@@ -121,7 +125,7 @@ export default function JobFinder() {
     finally { setSavingId(null); }
   };
 
-  // --- FUNZIONE GENERAZIONE MESSAGGI (ICEBREAKER) ---
+  // --- ICEBREAKER ---
   const handleOpenIcebreaker = async (job) => {
     setSelectedJobForIce(job);
     setOpenIcebreaker(true);
@@ -130,8 +134,10 @@ export default function JobFinder() {
 
     try {
         const token = localStorage.getItem('token');
-        // Usiamo le skill trovate come "keywords" per personalizzare il messaggio
-        const keywords = job.skills_found ? job.skills_found.join(", ") : "skills generiche";
+        // Se non abbiamo skill specifiche, usiamo il titolo come keyword
+        const keywords = (job.skills_found && job.skills_found.length > 0) 
+            ? job.skills_found.join(", ") 
+            : job.title;
         
         const res = await fetch('/api/ai/icebreaker', {
             method: 'POST',
@@ -174,11 +180,11 @@ export default function JobFinder() {
   const getScoreColor = (score) => {
     if (score >= 80) return 'text-emerald-600 border-emerald-500 bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400';
     if (score >= 50) return 'text-amber-600 border-amber-500 bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400';
-    return 'text-red-600 border-red-500 bg-red-100 dark:bg-red-500/10 dark:text-red-400';
+    return 'text-slate-500 border-slate-300 bg-slate-100 dark:bg-slate-800 dark:text-slate-400';
   };
 
   const getJobSource = (url) => {
-      if (!url || url === "#") return { name: 'Sconosciuto', icon: <Public fontSize="small"/>, color: 'bg-slate-100 text-slate-600' };
+      if (!url || url === "#") return { name: 'Web', icon: <Public fontSize="small"/>, color: 'bg-slate-100 text-slate-600' };
       const lowerUrl = url.toLowerCase();
       if (lowerUrl.includes('linkedin')) return { name: 'LinkedIn', icon: <LinkedIn fontSize="small"/>, color: 'bg-[#0077b5]/10 text-[#0077b5] border-[#0077b5]/20' };
       if (lowerUrl.includes('indeed')) return { name: 'Indeed', icon: <Language fontSize="small"/>, color: 'bg-[#003A9B]/10 text-[#003A9B] border-[#003A9B]/20' };
@@ -209,7 +215,7 @@ export default function JobFinder() {
           AI Job <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-cyan-400 dark:to-indigo-400">Hunter</span>
         </Typography>
         <Typography className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto">
-          Trova le offerte migliori e usa gli Smart Link per candidarti direttamente su LinkedIn.
+          Cerca offerte reali su LinkedIn e Indeed e analizzale con l'AI.
         </Typography>
       </Box>
 
@@ -217,11 +223,11 @@ export default function JobFinder() {
       <Paper className="glass-panel p-6 md:p-8 rounded-[2rem] mb-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mb-6">
           <div className="md:col-span-5">
-            <TextField fullWidth placeholder="Ruolo (es. Planner)" value={filters.query} onChange={(e) => setFilters({...filters, query: e.target.value})} className="input-glass" InputProps={{ startAdornment: <InputAdornment position="start"><Search className="text-slate-400"/></InputAdornment> }} />
+            <TextField fullWidth placeholder="Ruolo (es. React Developer)" value={filters.query} onChange={(e) => setFilters({...filters, query: e.target.value})} className="input-glass" InputProps={{ startAdornment: <InputAdornment position="start"><Search className="text-slate-400"/></InputAdornment> }} />
           </div>
           <div className="md:col-span-4">
             <Autocomplete freeSolo options={cityOptions} inputValue={cityInputValue} onInputChange={(e, val) => { setCityInputValue(val); setFilters({...filters, location: val}); }}
-                renderInput={(params) => (<TextField {...params} placeholder="Dove? (Città o Regione)" fullWidth className="input-glass" InputProps={{ ...params.InputProps, startAdornment: (<InputAdornment position="start" className="pl-2"><LocationOn className="text-slate-400" /></InputAdornment>) }} />)}
+                renderInput={(params) => (<TextField {...params} placeholder="Dove? (Città)" fullWidth className="input-glass" InputProps={{ ...params.InputProps, startAdornment: (<InputAdornment position="start" className="pl-2"><LocationOn className="text-slate-400" /></InputAdornment>) }} />)}
                 PaperComponent={({ children }) => <Paper className="bg-white dark:bg-[#1e293b] rounded-xl shadow-xl mt-2">{children}</Paper>}
             />
           </div>
@@ -248,18 +254,18 @@ export default function JobFinder() {
       {/* HEADER RISULTATI */}
       {results.length > 0 && (
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-              <Typography className="font-bold text-slate-600 dark:text-slate-300">Mostrando {sortedResults.length} di {results.length} opportunità trovate</Typography>
-              <div className="flex items-center gap-3"><SortIcon className="text-slate-400" /><FormControl size="small" className="min-w-[180px]"><Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${selectStyle} h-10`} displayEmpty><MenuItem value="relevance">Rilevanza (Default)</MenuItem><MenuItem value="match_desc">Compatibilità (Alta ➜ Bassa)</MenuItem><MenuItem value="match_asc">Compatibilità (Bassa ➜ Alta)</MenuItem></Select></FormControl></div>
+              <Typography className="font-bold text-slate-600 dark:text-slate-300">Mostrando {sortedResults.length} di {results.length} opportunità</Typography>
+              <div className="flex items-center gap-3"><SortIcon className="text-slate-400" /><FormControl size="small" className="min-w-[180px]"><Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${selectStyle} h-10`} displayEmpty><MenuItem value="match_desc">Compatibilità (Alta)</MenuItem><MenuItem value="match_asc">Compatibilità (Bassa)</MenuItem></Select></FormControl></div>
           </div>
       )}
 
       {/* RESULTS LIST */}
       {loading ? (
-          <div className="text-center py-20"><CircularProgress size={60} thickness={4} className="text-blue-500 mb-4" /><Typography className="text-slate-500 dark:text-slate-400 animate-pulse font-medium">L'AI sta analizzando LinkedIn, Indeed e il Web...</Typography></div>
+          <div className="text-center py-20"><CircularProgress size={60} thickness={4} className="text-blue-500 mb-4" /><Typography className="text-slate-500 dark:text-slate-400 animate-pulse font-medium">Scansionando il web in tempo reale...</Typography></div>
       ) : (
           <div className="grid grid-cols-1 gap-4">
               {sortedResults.length === 0 && results.length > 0 && (
-                  <div className="text-center py-10 opacity-60"><Cancel fontSize="large" className="mb-2"/><Typography>Nessun risultato supera il filtro di compatibilità del {filters.minMatch}%.</Typography><Button onClick={() => setFilters({...filters, minMatch: 0})} className="mt-2 text-blue-500">Abbassa il filtro</Button></div>
+                  <div className="text-center py-10 opacity-60"><Cancel fontSize="large" className="mb-2"/><Typography>Nessun risultato supera il filtro di compatibilità.</Typography><Button onClick={() => setFilters({...filters, minMatch: 0})} className="mt-2 text-blue-500">Rimuovi Filtro</Button></div>
               )}
 
               {sortedResults.map((job) => {
@@ -270,15 +276,28 @@ export default function JobFinder() {
                             <Avatar className="w-16 h-16 rounded-2xl font-bold text-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 border border-slate-300 dark:from-slate-800 dark:to-slate-900 dark:text-white dark:border-white/10">
                                 {job.logo ? <img src={job.logo} alt="logo" className="w-full h-full object-cover rounded-2xl"/> : (job.company ? job.company[0] : 'J')}
                             </Avatar>
-                            <div>
+                            <div className="flex-1">
                                 <Typography variant="h5" className="font-bold text-slate-900 dark:text-white">{job.title}</Typography>
-                                <Typography className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2"><WorkOutline fontSize="small"/> {job.company} <span className="w-1 h-1 bg-slate-400 rounded-full mx-1"></span> {job.location}</Typography>
+                                <Typography className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2 text-sm"><WorkOutline style={{fontSize: 16}}/> {job.company} <span className="w-1 h-1 bg-slate-400 rounded-full mx-1"></span> {job.location}</Typography>
                                 
-                                <div className="flex gap-2 mt-4">
-                                    <Tooltip title="Cerca su LinkedIn"><Button size="small" href={generateSmartLink(job.title, job.company, 'linkedin')} target="_blank" className="bg-[#0077b5]/10 text-[#0077b5] border border-[#0077b5]/20 hover:bg-[#0077b5]/20 font-bold rounded-lg normal-case" startIcon={<LinkedIn />}>LinkedIn</Button></Tooltip>
-                                    <Tooltip title="Cerca su Google Jobs"><Button size="small" href={generateSmartLink(job.title, job.company, 'google')} target="_blank" className="bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 font-bold rounded-lg normal-case dark:bg-white/10 dark:text-white dark:border-white/20" startIcon={<Google />}>Google</Button></Tooltip>
-                                    
-                                    {/* NUOVO BOTTONE ICEBREAKER */}
+                                <div className="mt-3 flex gap-2 flex-wrap items-center">
+                                    <Chip label={source.name} size="small" icon={source.icon} className={`${source.color} font-bold text-xs border border-transparent`} />
+                                    {job.type && <Chip label={job.type} size="small" className="bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-white/10" />}
+                                </div>
+
+                                <div className="flex gap-2 mt-4 flex-wrap">
+                                    {/* PULSANTE CANDIDATURA REALE */}
+                                    <Button 
+                                        variant="contained" 
+                                        size="small" 
+                                        href={job.link} 
+                                        target="_blank" 
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg normal-case" 
+                                        startIcon={<OpenInNew />}
+                                    >
+                                        Candidati Ora
+                                    </Button>
+
                                     <Tooltip title="Genera messaggio per Recruiter">
                                         <Button 
                                             size="small" 
@@ -290,25 +309,34 @@ export default function JobFinder() {
                                         </Button>
                                     </Tooltip>
                                 </div>
-                                <div className="mt-3 flex gap-2 flex-wrap">
-                                    <Chip label={source.name} size="small" icon={source.icon} className={`${source.color} font-bold text-xs border border-transparent`} />
-                                    <Chip label={job.type} size="small" className="bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-white/10" />
-                                </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-col md:items-end justify-between gap-4 md:w-72 md:border-l border-slate-100 dark:border-white/10 md:pl-6">
+                        <div className="flex flex-col md:items-end justify-between gap-4 md:w-80 md:border-l border-slate-100 dark:border-white/10 md:pl-6">
                             <div className="flex items-center gap-4 w-full justify-between md:justify-end">
-                                <div className="text-right"><Typography variant="caption" className="text-slate-400 block uppercase tracking-wider font-bold">Compatibilità</Typography><Typography variant="h4" className={`font-black ${getScoreColor(job.matchScore).split(' ')[0]}`}>{job.matchScore}%</Typography></div>
+                                <div className="text-right">
+                                    <Typography variant="caption" className="text-slate-400 block uppercase tracking-wider font-bold">Compatibilità</Typography>
+                                    <Typography variant="h4" className={`font-black ${getScoreColor(job.matchScore).split(' ')[0]}`}>{job.matchScore > 0 ? job.matchScore + '%' : 'N/A'}</Typography>
+                                </div>
                                 <div className={`relative w-12 h-12 rounded-full border-4 flex items-center justify-center ${getScoreColor(job.matchScore)}`}><Bolt fontSize="medium" className="text-current" /></div>
                             </div>
+                            
                             <div className="w-full">
-                                <div className="flex gap-1 mb-3 flex-wrap justify-start md:justify-end">
-                                    {job.skills_found.slice(0,3).map(s => (<span key={s} className="text-[10px] bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-1 font-bold"><CheckCircle style={{fontSize: 10}}/> {s}</span>))}
-                                    {job.skills_missing.slice(0,2).map(s => (<span key={s} className="text-[10px] bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-1 rounded-md border border-red-200 dark:border-red-500/20 flex items-center gap-1 font-bold opacity-70"><Cancel style={{fontSize: 10}}/> {s}</span>))}
+                                {/* Visualizzazione Intelligente: Se ci sono skill le mostro, altrimenti mostro la spiegazione */}
+                                <div className="mb-4 bg-slate-50 dark:bg-black/20 p-3 rounded-xl border border-slate-100 dark:border-white/5">
+                                    {job.skills_found && job.skills_found.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1 justify-end">
+                                            {job.skills_found.slice(0, 3).map(s => <span key={s} className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200">✓ {s}</span>)}
+                                        </div>
+                                    ) : (
+                                        <Typography variant="caption" className="text-slate-500 dark:text-slate-400 italic leading-tight block text-right">
+                                            "{job.explainability || "Clicca per dettagli..."}"
+                                        </Typography>
+                                    )}
                                 </div>
-                                <Button fullWidth variant="contained" size="small" onClick={() => handleSaveJob(job)} disabled={savingId === job.id} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 shadow-lg shadow-indigo-500/30" startIcon={savingId === job.id ? <CircularProgress size={18} color="inherit"/> : <BookmarkBorder/>}>
-                                    {savingId === job.id ? "Salvataggio..." : "Salva in Jobs"}
+
+                                <Button fullWidth variant="outlined" size="small" onClick={() => handleSaveJob(job)} disabled={savingId === job.id} className="rounded-xl border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/5 font-bold py-2" startIcon={savingId === job.id ? <CircularProgress size={18} color="inherit"/> : <BookmarkBorder/>}>
+                                    {savingId === job.id ? "Salvataggio..." : "Salva in Dashboard"}
                                 </Button>
                             </div>
                         </div>

@@ -11,7 +11,8 @@ const handleAIError = (res, error, context) => {
   console.error(`Errore AI [${context}]:`, error);
   if (error.status === 429 || error.message?.includes("429")) {
     return res.status(429).json({
-      error: "⚠️ Quota 'Gemini 2.5 PRO' esaurita. Riprova più tardi.",
+      error:
+        "⚠️ Quota 'Gemini' esaurita o Limite API raggiunto. Riprova più tardi.",
     });
   }
   res.status(500).json({ error: `Errore durante ${context}` });
@@ -24,7 +25,7 @@ export const generateCoverLetter = async (req, res) => {
   const { company, position, tone, userName } = req.body;
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const userRes = await query(
       "SELECT hard_skills, soft_skills FROM users WHERE id = $1",
@@ -120,7 +121,7 @@ export const analyzeCV = async (req, res) => {
 
     const pdfData = await pdf(dbResult.rows[0].cv_file);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Analizza il CV.
     Testo: ${pdfData.text.substring(0, 15000)}
@@ -169,7 +170,7 @@ export const getScoreHistory = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 5. SCRAPE URL
+// 5. SCRAPE URL (Helper per importare da link esterno)
 // ------------------------------------------------------------------
 export const scrapeJob = async (req, res) => {
   const { url } = req.body;
@@ -182,7 +183,7 @@ export const scrapeJob = async (req, res) => {
     const cleanContent = html.replace(/<[^>]+>/g, " ").substring(0, 15000);
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await model.generateContent(
       `Estrai dati annuncio da questo testo:
@@ -225,7 +226,7 @@ export const getJobMatch = async (req, res) => {
       return res.status(404).json({ error: "Dati mancanti" });
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Analizza Fit Candidato vs Job.
     Skills: ${userRes.rows[0].hard_skills}, ${userRes.rows[0].soft_skills}
@@ -265,7 +266,7 @@ export const extractCVData = async (req, res) => {
 
     const pdfData = await pdf(dbResult.rows[0].cv_file);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Estrai dati CV in JSON.
     Testo: ${pdfData.text.substring(0, 25000)}
@@ -330,22 +331,47 @@ export const extractCVData = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
-// 8. JOB FINDER REALE
+// 8. JOB FINDER REALE (CON JSEARCH RAPIDAPI)
 // ------------------------------------------------------------------
 export const searchJobs = async (req, res) => {
+  // Supporto per parametri sia in Query String (GET) che nel Body (POST)
+  const params = { ...req.query, ...req.body };
+
   const {
-    query: searchTerms,
+    query: searchTerms, // 'query' o 'q'
+    q,
     location,
     remoteOnly,
     datePosted,
-    jobType,
-    experience,
-  } = req.body;
-  try {
-    if (!process.env.RAPIDAPI_KEY)
-      return res.status(500).json({ error: "API Key mancante." });
+  } = params;
 
-    const finalQuery = `${searchTerms} in ${location}`;
+  // Usa 'q' se 'query' è vuoto
+  const term = searchTerms || q;
+
+  try {
+    if (!process.env.RAPIDAPI_KEY) {
+      console.error("RAPIDAPI_KEY mancante nel .env");
+      return res
+        .status(500)
+        .json({
+          error: "Configurazione Server incompleta (API Key mancante).",
+        });
+    }
+
+    if (!term) {
+      return res
+        .status(400)
+        .json({
+          error: "Inserisci un termine di ricerca (es. React Developer).",
+        });
+    }
+
+    // Costruzione query JSearch
+    let finalQuery = term;
+    if (location && location !== "undefined") {
+      finalQuery += ` in ${location}`;
+    }
+
     const options = {
       method: "GET",
       url: "https://jsearch.p.rapidapi.com/search",
@@ -355,7 +381,10 @@ export const searchJobs = async (req, res) => {
         num_pages: "1",
         date_posted: datePosted || "month",
         country: "it",
-        ...(remoteOnly && { remote_jobs_only: "true" }),
+        // Filtro remoto se richiesto
+        ...(remoteOnly === "true" || remoteOnly === true
+          ? { remote_jobs_only: "true" }
+          : {}),
       },
       headers: {
         "X-RapidAPI-Key": process.env.RAPIDAPI_KEY,
@@ -363,42 +392,60 @@ export const searchJobs = async (req, res) => {
       },
     };
 
+    console.log(`🔍 Cercando su JSearch: ${finalQuery}`);
     const apiRes = await axios.request(options);
     const realJobs = apiRes.data.data;
-    if (!realJobs || realJobs.length === 0) return res.json([]);
 
-    // AI Analysis (Gemini 2.5)
+    if (!realJobs || realJobs.length === 0) {
+      return res.json([]);
+    }
+
+    // --- AI ANALYSIS (Opzionale e limitata) ---
+    // Analizziamo solo i primi 6 risultati per non saturare Gemini e rispondere veloci
     const jobsToAnalyze = realJobs.slice(0, 6);
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    const jobsDataString = JSON.stringify(
-      jobsToAnalyze.map((j) => ({
-        id: j.job_id,
-        title: j.job_title,
-        desc: j.job_description?.substring(0, 400),
-      })),
-    );
-
-    const prompt = `Analizza jobs.
-    Offerte: ${jobsDataString}
-    
-    Output JSON Array:
-    [{ "id": "...", "matchScore": 0, "hard_skills_found": [], "hard_skills_missing": [], "soft_skills_found": [], "soft_skills_missing": [], "explainability": "..." }]`;
-
-    const aiResult = await model.generateContent(prompt);
-    const aiText = aiResult.response
-      .text()
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+    // Default: Nessuna analisi se Gemini fallisce
     let aiAnalysis = [];
-    try {
-      aiAnalysis = JSON.parse(aiText);
-    } catch (e) {}
 
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+      const jobsDataString = JSON.stringify(
+        jobsToAnalyze.map((j) => ({
+          id: j.job_id,
+          title: j.job_title,
+          desc: j.job_description ? j.job_description.substring(0, 200) : "N/A", // Breve snippet
+        })),
+      );
+
+      const prompt = `Valuta brevemente questi lavori.
+        Dati: ${jobsDataString}
+        
+        Output JSON Array (solo ID e score 0-100):
+        [{ "id": "...", "matchScore": 85, "explainability": "breve motivo" }]`;
+
+      const aiResult = await model.generateContent(prompt);
+      const aiText = aiResult.response
+        .text()
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+
+      aiAnalysis = JSON.parse(aiText);
+    } catch (e) {
+      console.warn(
+        "⚠️ AI Analysis saltata per timeout o errore, restituisco solo i dati JSearch.",
+      );
+    }
+
+    // Unione dati JSearch + AI
     const finalResults = jobsToAnalyze.map((job) => {
       const analysis = aiAnalysis.find((a) => a.id === job.job_id) || {};
+
+      // LOGICA LINK: Cerca il link diretto, altrimenti usa link alternativi
+      const validLink = job.job_apply_link || job.job_google_link || job.url;
+
       return {
         id: job.job_id,
         title: job.job_title,
@@ -406,25 +453,21 @@ export const searchJobs = async (req, res) => {
         location: job.job_city || "Remoto",
         type: job.job_employment_type,
         logo: job.employer_logo,
-        description: job.job_description,
-        link: job.job_apply_link,
-        matchScore: analysis.matchScore || 0,
-        skills_found: [
-          ...(analysis.hard_skills_found || []),
-          ...(analysis.soft_skills_found || []),
-        ],
-        skills_missing: [
-          ...(analysis.hard_skills_missing || []),
-          ...(analysis.soft_skills_missing || []),
-        ],
-        explainability: analysis.explainability || "N/A",
+        description: job.job_description, // Testo completo
+        link: validLink, // <--- Link funzionante
+        matchScore: analysis.matchScore || 0, // 0 se AI ha fallito
+        explainability: analysis.explainability || "Nuova opportunità trovata",
       };
     });
 
     res.json(finalResults);
   } catch (error) {
-    if (error.response?.status === 429)
-      return res.status(429).json({ error: "Limit API JSearch." });
+    console.error("Errore Search Jobs:", error.message);
+    if (error.response?.status === 429) {
+      return res
+        .status(429)
+        .json({ error: "Limite API Ricerca raggiunto. Riprova domani." });
+    }
     handleAIError(res, error, "Job Search");
   }
 };
@@ -436,7 +479,7 @@ export const generateIcebreaker = async (req, res) => {
   const { company, position, keywords } = req.body;
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Genera 3 messaggi LinkedIn.
     Ruolo: ${position} @ ${company}. Keywords: ${keywords}.
@@ -468,7 +511,7 @@ export const tailorCV = async (req, res) => {
 
     const pdfData = await pdf(dbResult.rows[0].cv_file);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Tailoring CV.
     CV: ${pdfData.text.substring(0, 5000)}
@@ -494,7 +537,7 @@ export const generateFollowUp = async (req, res) => {
   const { company, position, daysAgo } = req.body;
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Email Follow-up (Formale, Neutra, Confidente).
     ${position} @ ${company}, ${daysAgo} giorni fa.
@@ -531,7 +574,7 @@ export const generateInterviewQuestions = async (req, res) => {
   const { company, position, jobDescription } = req.body;
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `Simula colloquio ${position} @ ${company}.
     Output JSON: [{ "type": "", "question": "", "follow_up_question": "", "recruiter_intent": "", "sample_answer": "", "scoring_criteria": {} }]`;
