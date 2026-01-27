@@ -8,22 +8,24 @@ import {
   Add, Psychology, TrendingUp, ArrowForward, WorkOutline, 
   EmojiEvents, Lightbulb, CheckCircle, HighlightOff, Send, 
   AutoAwesome, PieChart, ChevronLeft, ChevronRight, AccessTime,
-  CalendarToday, MarkEmailUnread, CloudUpload, AutoFixHigh
+  CalendarToday, MarkEmailUnread, CloudUpload, AutoFixHigh, Extension // <--- Icona Estensione aggiunta
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 
-// --- CHART.JS IMPORTS ---
+// --- IMPORTS ---
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip as ChartTooltip, Filler
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-
-// --- DATE-FNS IMPORTS ---
 import { 
   format, startOfWeek, addDays, startOfMonth, endOfMonth, 
   endOfWeek, isSameMonth, isSameDay, addMonths, subMonths, isToday 
 } from 'date-fns';
 import { it } from 'date-fns/locale';
+
+// NUOVI COMPONENTI
+import ExtensionInstallModal from '../components/ExtensionInstallModal';
+import WelcomeTour from '../components/WelcomeTour'; // <--- IMPORTA IL TOUR
 
 // Registrazione componenti Chart.js
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, ChartTooltip, Filler);
@@ -54,12 +56,14 @@ export default function Dashboard() {
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
 
+  // Extension Modal State
+  const [extensionModalOpen, setExtensionModalOpen] = useState(false);
+
   const WEEKLY_TARGET = 5; 
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     
-    // 1. Caricamento iniziale veloce da LocalStorage (per evitare flash vuoti)
     const localData = localStorage.getItem('user');
     if (localData && localData !== "undefined") {
       try { setUser(JSON.parse(localData)); } catch (e) {}
@@ -76,23 +80,18 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        // A. RECUPERA PROFILO UTENTE AGGIORNATO
-        const userRes = await fetch('/api/users/profile', { 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const userRes = await fetch('/api/users/profile', { headers: { 'Authorization': `Bearer ${token}` } });
         if (userRes.ok) {
             const userData = await userRes.json();
-            setUser(userData); // Aggiorna lo stato con i dati freschi dal DB
-            localStorage.setItem('user', JSON.stringify(userData)); // Aggiorna anche il localStorage per il futuro
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
         }
 
-        // B. RECUPERA JOBS
         const jobsRes = await fetch('/api/jobs', { headers: { 'Authorization': `Bearer ${token}` } });
         if (jobsRes.ok) {
           const jobsData = await jobsRes.json();
           setJobs(jobsData);
           
-          // Stats Calculation
           const now = new Date();
           const startOfWk = new Date(now.setDate(now.getDate() - now.getDay() + 1)); 
           startOfWk.setHours(0,0,0,0);
@@ -109,7 +108,6 @@ export default function Dashboard() {
           setFollowUpCount(jobsData.filter(j => j.status === 'applied' && new Date(j.created_at) < sevenDaysAgo).length);
         }
 
-        // C. RECUPERA COACH
         try {
             const coachRes = await fetch('/api/coach/history', { headers: { 'Authorization': `Bearer ${token}` } });
             if (coachRes.ok) setCoachProfile(await coachRes.json());
@@ -123,13 +121,11 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [navigate]);
 
-  // --- CHART DATA PREPARATION ---
   const chartData = useMemo(() => {
     const labels = [];
     const dataPoints = [];
     const today = new Date();
     
-    // Ultimi 14 giorni
     for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(today.getDate() - i);
@@ -151,7 +147,7 @@ export default function Dashboard() {
             data: dataPoints,
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.1)',
-            tension: 0.4, // Linea curva
+            tension: 0.4,
             pointRadius: 4,
             pointBackgroundColor: '#fff',
             pointBorderColor: '#6366f1',
@@ -163,13 +159,9 @@ export default function Dashboard() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', padding: 10, cornerRadius: 8 } },
-    scales: { 
-        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }, 
-        y: { display: false, min: 0 } 
-    }
+    scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } }, y: { display: false, min: 0 } }
   };
 
-  // --- CALENDAR LOGIC ---
   const renderCalendar = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -185,13 +177,7 @@ export default function Dashboard() {
         for (let i = 0; i < 7; i++) {
             formattedDate = format(day, dateFormat);
             const cloneDay = day;
-            
-            // Trova colloqui in questo giorno
-            const interviewsToday = jobs.filter(j => 
-                j.status === 'interview' && 
-                j.interview_date && 
-                isSameDay(new Date(j.interview_date), cloneDay)
-            );
+            const interviewsToday = jobs.filter(j => j.status === 'interview' && j.interview_date && isSameDay(new Date(j.interview_date), cloneDay));
             const hasInterview = interviewsToday.length > 0;
             const isSelected = isSameDay(day, selectedDate);
 
@@ -205,9 +191,7 @@ export default function Dashboard() {
                     onClick={() => setSelectedDate(cloneDay)}
                 >
                     <span className="text-sm font-bold z-10">{formattedDate}</span>
-                    {hasInterview && !isSelected && (
-                        <span className="absolute bottom-1 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    )}
+                    {hasInterview && !isSelected && (<span className="absolute bottom-1 w-1.5 h-1.5 bg-red-500 rounded-full"></span>)}
                 </div>
             );
             day = addDays(day, 1);
@@ -218,47 +202,27 @@ export default function Dashboard() {
     return <div className="w-full">{rows}</div>;
   };
 
-  // Interviews for Selected Date
-  const selectedInterviews = jobs.filter(j => 
-    j.status === 'interview' && 
-    j.interview_date && 
-    isSameDay(new Date(j.interview_date), selectedDate)
-  );
+  const selectedInterviews = jobs.filter(j => j.status === 'interview' && j.interview_date && isSameDay(new Date(j.interview_date), selectedDate));
 
-  // --- CV Upload Handlers ---
   const handleCvFileChange = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
-        setCvFile(file);
-    } else {
-        toast.error("Per favore carica un file PDF valido.");
-    }
+    if (file && file.type === 'application/pdf') setCvFile(file);
+    else toast.error("Per favore carica un file PDF valido.");
   };
 
   const handleCvUploadAndExtract = async () => {
     if (!cvFile) return;
-    
     setUploading(true);
     const token = localStorage.getItem('token');
     const formData = new FormData();
     formData.append('cv', cvFile);
 
     try {
-        // 1. Upload
-        const uploadRes = await fetch('/api/ai/upload-cv', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-
+        const uploadRes = await fetch('/api/ai/upload-cv', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
         if (!uploadRes.ok) throw new Error("Errore upload");
         
-        // 2. Extract Data
         setExtracting(true);
-        const extractRes = await fetch('/api/ai/extract-profile', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const extractRes = await fetch('/api/ai/extract-profile', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
 
         if (extractRes.ok) {
             const data = await extractRes.json();
@@ -266,19 +230,10 @@ export default function Dashboard() {
             localStorage.setItem('user', JSON.stringify(data.user));
             toast.success("CV Caricato e Profilo Aggiornato! 🚀");
             setCvModalOpen(false);
-        } else {
-            throw new Error("Errore estrazione dati");
-        }
-
-    } catch (error) {
-        toast.error("Si è verificato un errore.");
-        console.error(error);
-    } finally {
-        setUploading(false);
-        setExtracting(false);
-    }
+        } else { throw new Error("Errore estrazione dati"); }
+    } catch (error) { toast.error("Si è verificato un errore."); console.error(error); } 
+    finally { setUploading(false); setExtracting(false); }
   };
-
 
   if (loading) return <div className="flex justify-center mt-20"><CircularProgress /></div>;
 
@@ -305,6 +260,9 @@ export default function Dashboard() {
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 pb-24 md:pb-12 text-slate-900 dark:text-slate-100 transition-colors duration-300 bg-slate-100 dark:bg-[#0f172a]">
       
+      {/* --- INSERISCI IL TOUR QUI --- */}
+      <WelcomeTour /> 
+
       {/* 1. HEADER */}
       <div className="glass-panel p-5 rounded-3xl mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
         <div className="flex items-center gap-4 w-full">
@@ -317,28 +275,58 @@ export default function Dashboard() {
                     <span className="w-1 h-1 bg-slate-400 rounded-full"></span>
                     <span className="text-blue-600 dark:text-cyan-400">{formattedTime}</span>
                 </div>
-                {/* SALUTO CON NOME UTENTE AGGIORNATO */}
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white leading-tight">
                     {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-cyan-400 dark:to-indigo-400">{user?.first_name || 'JobPilot'}</span>
                 </h1>
             </div>
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r ${smartTip.style} border backdrop-blur-md cursor-pointer hover:scale-105 transition-transform`} onClick={() => navigate('/jobs')}>
+            {/* Widget Smart Tip con ID per il Tour */}
+            <div id="ai-coach-widget" className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r ${smartTip.style} border backdrop-blur-md cursor-pointer hover:scale-105 transition-transform`} onClick={() => navigate('/jobs')}>
                 <Avatar sx={{ width: 24, height: 24, bgcolor: 'rgba(255,255,255,0.5)' }} className="text-slate-700">{smartTip.icon}</Avatar>
                 <Typography variant="caption" className="font-bold hidden sm:block">{smartTip.text}</Typography>
             </div>
         </div>
+        
+        {/* ACTION BUTTONS */}
         <div className="flex gap-2 w-full lg:w-auto">
-            <Button variant="outlined" startIcon={<CloudUpload />} onClick={() => setCvModalOpen(true)} className="border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-white hover:text-slate-800 dark:hover:text-white w-full lg:w-auto px-4 py-3 rounded-xl font-bold">
+            
+            {/* Bottone Estensione con ID */}
+            <Tooltip title="Scarica Estensione Chrome">
+                <Button 
+                    id="extension-btn" 
+                    variant="outlined" 
+                    onClick={() => setExtensionModalOpen(true)}
+                    className="border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-white hover:text-slate-800 dark:hover:text-white px-3 py-3 rounded-xl min-w-[50px]"
+                >
+                    <Extension />
+                </Button>
+            </Tooltip>
+
+            {/* Bottone Upload CV con ID */}
+            <Button 
+                id="cv-upload-btn" 
+                variant="outlined" 
+                startIcon={<CloudUpload />} 
+                onClick={() => setCvModalOpen(true)} 
+                className="border-slate-300 dark:border-slate-500 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-white hover:text-slate-800 dark:hover:text-white w-full lg:w-auto px-4 py-3 rounded-xl font-bold"
+            >
                 Carica CV
             </Button>
-            <Button variant="contained" startIcon={<Add />} onClick={() => navigate('/jobs')} className="btn-neon w-full lg:w-auto px-6 py-3 rounded-xl font-bold">
+
+            {/* Bottone Nuova Candidatura con ID */}
+            <Button 
+                id="add-job-btn" 
+                variant="contained" 
+                startIcon={<Add />} 
+                onClick={() => navigate('/jobs')} 
+                className="btn-neon w-full lg:w-auto px-6 py-3 rounded-xl font-bold"
+            >
                 Nuova Candidatura
             </Button>
         </div>
       </div>
 
-      {/* 2. STATS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      {/* 2. STATS GRID con ID per il Tour */}
+      <div id="stats-section" className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {stats.map((stat, idx) => (
             <div key={idx} className={`glass-panel p-4 rounded-2xl flex flex-col justify-between gap-1 border-t-2 bg-white dark:bg-transparent shadow-md dark:shadow-none ${stat.bg.split(' ')[2]}`}> 
                 <div className="flex justify-between items-center w-full relative">
@@ -354,10 +342,8 @@ export default function Dashboard() {
       {/* 3. LAYOUT PRINCIPALE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* COLONNA SINISTRA (Chart + Attività) */}
+        {/* COLONNA SINISTRA */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-            
-            {/* GRAFICO CHART.JS */}
             <Paper className="glass-panel p-6 rounded-3xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none min-h-[300px] flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                     <Typography variant="h6" className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><TrendingUp className="text-indigo-500"/> Andamento Candidature</Typography>
@@ -368,7 +354,6 @@ export default function Dashboard() {
                 </div>
             </Paper>
 
-            {/* FEED ATTIVITÀ */}
             <Paper className="glass-panel p-5 rounded-3xl flex-1 flex flex-col min-h-[300px] bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
                 <div className="flex justify-between items-center mb-4 px-1">
                     <Typography variant="h6" className="font-bold text-slate-800 dark:text-white">Attività Recente</Typography>
@@ -391,10 +376,8 @@ export default function Dashboard() {
             </Paper>
         </div>
 
-        {/* COLONNA DESTRA (Calendario + Widget) */}
+        {/* COLONNA DESTRA */}
         <div className="lg:col-span-1 flex flex-col gap-6">
-            
-            {/* CALENDARIO SMART */}
             <Paper className="glass-panel p-6 rounded-3xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
                 <div className="flex justify-between items-center mb-6">
                     <Typography variant="h6" className="font-bold text-slate-800 dark:text-white capitalize">{format(currentMonth, 'MMMM yyyy', { locale: it })}</Typography>
@@ -403,22 +386,16 @@ export default function Dashboard() {
                         <IconButton size="small" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight /></IconButton>
                     </div>
                 </div>
-                
-                {/* Griglia Calendario */}
                 <div className="grid grid-cols-7 mb-2">
-                    {/* FIX: Uso l'indice (i) come key perché 'M' appare due volte */}
                     {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
                         <span key={i} className="text-center text-xs font-bold text-slate-400 py-2">{d}</span>
                     ))}
                 </div>
                 {renderCalendar()}
-
-                {/* Dettagli Giorno Selezionato */}
                 <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10">
                     <Typography variant="caption" className="uppercase font-bold text-slate-500 dark:text-slate-400 mb-2 block">
                         {isToday(selectedDate) ? "Oggi" : format(selectedDate, 'd MMMM', { locale: it })}
                     </Typography>
-                    
                     {selectedInterviews.length > 0 ? (
                         <div className="space-y-2">
                             {selectedInterviews.map(int => (
@@ -437,7 +414,6 @@ export default function Dashboard() {
                 </div>
             </Paper>
 
-            {/* Weekly Goal */}
             <Paper className="glass-panel p-5 rounded-3xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -452,7 +428,6 @@ export default function Dashboard() {
                 <LinearProgress variant="determinate" value={weeklyProgress} className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 w-full" sx={{ '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: 10 } }} />
             </Paper>
 
-            {/* AI Coach Mini */}
             <Paper className="glass-panel p-5 rounded-3xl bg-gradient-to-br from-indigo-100 to-white dark:from-indigo-900/40 dark:to-slate-900/40 border border-indigo-200 dark:border-indigo-500/30 relative overflow-hidden group shadow-xl dark:shadow-none cursor-pointer" onClick={() => navigate('/coach')}>
                 <div className="relative z-10 flex items-center justify-between gap-3">
                     <div>
@@ -479,13 +454,7 @@ export default function Dashboard() {
           </DialogTitle>
           <DialogContent className="pt-6">
               <div className="flex flex-col items-center gap-4 py-6">
-                  <input
-                      accept="application/pdf"
-                      style={{ display: 'none' }}
-                      id="raised-button-file"
-                      type="file"
-                      onChange={handleCvFileChange}
-                  />
+                  <input accept="application/pdf" style={{ display: 'none' }} id="raised-button-file" type="file" onChange={handleCvFileChange} />
                   <label htmlFor="raised-button-file" className="w-full">
                       <div className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer transition-colors ${cvFile ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10' : 'border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           {cvFile ? (
@@ -504,26 +473,22 @@ export default function Dashboard() {
                       </div>
                   </label>
                   
-                  {cvFile && (
-                      <Typography variant="caption" className="text-slate-500 text-center max-w-xs">
-                          L'AI analizzerà il tuo CV per estrarre automaticamente skills ed esperienze.
-                      </Typography>
-                  )}
+                  {cvFile && (<Typography variant="caption" className="text-slate-500 text-center max-w-xs">L'AI analizzerà il tuo CV per estrarre automaticamente skills ed esperienze.</Typography>)}
               </div>
           </DialogContent>
           <DialogActions className="p-6 border-t border-slate-200 dark:border-white/10">
               <Button onClick={() => setCvModalOpen(false)} className="text-slate-500">Annulla</Button>
-              <Button 
-                  variant="contained" 
-                  onClick={handleCvUploadAndExtract}
-                  disabled={!cvFile || uploading || extracting}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-6"
-                  startIcon={uploading || extracting ? <CircularProgress size={20} color="inherit"/> : <AutoFixHigh />}
-              >
+              <Button variant="contained" onClick={handleCvUploadAndExtract} disabled={!cvFile || uploading || extracting} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold px-6" startIcon={uploading || extracting ? <CircularProgress size={20} color="inherit"/> : <AutoFixHigh />}>
                   {uploading ? "Caricamento..." : extracting ? "Analisi AI..." : "Carica e Analizza"}
               </Button>
           </DialogActions>
       </Dialog>
+      
+      {/* EXTENSION INSTALL MODAL */}
+      <ExtensionInstallModal 
+        open={extensionModalOpen} 
+        onClose={() => setExtensionModalOpen(false)} 
+      />
 
     </div>
   );

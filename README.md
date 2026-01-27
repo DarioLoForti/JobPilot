@@ -1,45 +1,65 @@
-# ✈️ JobPilot - Smart Job Application Tracker
+# ✈️ JobPilot - AI-Powered Job Application Tracker
 
-**JobPilot** è un'applicazione Full-Stack moderna progettata per semplificare e organizzare il processo di ricerca lavoro. Permette agli utenti di tracciare le candidature tramite una Kanban Board intuitiva, gestire scadenze di colloqui, salvare note personali e generare CV in PDF.
+![JobPilot Banner](https://via.placeholder.com/1200x400?text=JobPilot+Dashboard+Preview)
+
+**JobPilot** è un'applicazione Full-Stack moderna progettata per rivoluzionare il processo di ricerca lavoro. Non è solo un tracker: è un assistente intelligente che sfrutta l'**Intelligenza Artificiale** per analizzare le offerte, ottimizzare il CV, generare lettere di presentazione e simulare colloqui.
+
+Permette agli utenti di tracciare le candidature tramite una Kanban Board intuitiva, gestire scadenze e sincronizzare i dati direttamente da LinkedIn tramite estensione Chrome.
 
 ## 🌟 Funzionalità Principali
 
+### 🧠 Intelligenza Artificiale (AI Suite)
+
+- **🤖 Match Analysis:** Analizza la compatibilità tra il tuo CV e la Job Description con punteggio percentuale e consigli strategici.
+- **✍️ AI Ghostwriter:** Genera lettere di presentazione personalizzate (formale, moderna, audace) in pochi secondi.
+- **🎨 Resume Tailoring:** Riscrive e ottimizza il tuo CV per superare i filtri ATS basandosi sull'annuncio specifico.
+- **🎤 Interview Simulator:** Simula un colloquio tecnico/comportamentale e ricevi feedback immediato.
+- **📧 Smart Follow-up:** Genera email di follow-up professionali per le candidature senza risposta.
+
+### 💼 Gestione & Organizzazione
+
 - **📊 Dashboard Interattiva:** Panoramica visiva con statistiche, grafici e widget per i prossimi colloqui.
-- **📋 Kanban Board Drag & Drop:** Gestione dello stato delle candidature (Da inviare, Inviato, Colloquio, Offerta, Rifiutato) tramite trascinamento fluido.
-- **🔎 Ricerca & Filtri:** Barra di ricerca istantanea per trovare rapidamente aziende o posizioni.
-- **📅 Gestione Colloqui:** Evidenziazione automatica dei prossimi appuntamenti con data e ora.
+- **📋 Kanban Board Drag & Drop:** Gestione fluida dello stato (Da inviare, Inviato, Colloquio, Offerta, Rifiutato).
+- **🧩 Chrome Extension:** Salva le offerte direttamente da **LinkedIn** e **Indeed** con un click, senza dover copiare/incollare manualmente.
+- **🔎 Ricerca & Filtri:** Barra di ricerca istantanea e filtri avanzati.
+- **📅 Gestione Colloqui:** Evidenziazione automatica dei prossimi appuntamenti.
+
+### ⚙️ Esperienza Utente
+
 - **🌙 Dark Mode:** Interfaccia moderna con supporto nativo al tema scuro/chiaro.
-- **✏️ Note & Dettagli:** Possibilità di modificare candidature e aggiungere note personali per ogni application.
-- **📄 PDF Generator:** Creazione automatica di un CV in formato PDF basato sui dati del profilo.
-- **🔔 Feedback Utente:** Notifiche "Toast" animate per ogni azione (Salvataggio, Errori, Conferme).
-- **📱 Responsive Design:** Ottimizzato per Desktop, Tablet e Mobile.
+- **📱 PWA (Progressive Web App):** Installabile su smartphone come app nativa (senza barra del browser).
+- **🔔 Feedback Utente:** Notifiche "Toast" animate per ogni azione.
+- **📄 PDF Generator:** Creazione automatica del CV in formato PDF.
 
 ## 🛠️ Tech Stack
 
 ### Frontend
 
-- **React (Vite):** Framework principale per un'esperienza SPA veloce.
-- **Tailwind CSS:** Per il layout responsive e lo styling moderno (Glassmorphism).
-- **Material UI (MUI):** Componenti complessi (Modali, Input, Datepicker).
-- **@hello-pangea/dnd:** Per la logica Drag & Drop della Kanban Board.
-- **Recharts:** Per la visualizzazione dati (Grafici a torta).
-- **React Hot Toast:** Per le notifiche utente eleganti.
+- **React (Vite):** Framework principale per un'esperienza SPA ultra-veloce.
+- **Tailwind CSS:** Styling moderno e responsivo.
+- **Material UI (MUI):** Componenti UI complessi (Modali, Datepicker).
+- **@hello-pangea/dnd:** Logica Drag & Drop per la Kanban.
+- **Vite PWA Plugin:** Per rendere l'app installabile su mobile.
+- **Recharts:** Visualizzazione dati e grafici.
 
 ### Backend
 
-- **Node.js & Express:** Server RESTful API robusto e scalabile.
-- **PostgreSQL:** Database relazionale per la persistenza dei dati.
-- **JWT (JSON Web Token):** Sistema di autenticazione sicuro e protetto.
-- **Bcrypt:** Hashing delle password per la sicurezza degli utenti.
+- **Node.js & Express:** Server RESTful API scalabile.
+- **PostgreSQL:** Database relazionale robusto.
+- **Google Gemini API:** Motore di intelligenza artificiale per l'analisi e la generazione testi.
+- **JWT & Bcrypt:** Autenticazione sicura e hashing delle password.
+
+### Chrome Extension
+
+- **Manifest V3:** Standard moderno per le estensioni browser.
+- **Scripting API:** Per lo scraping sicuro dei dati da siti terzi.
 
 ## 🚀 Installazione e Avvio Locale
 
-Segui questi passaggi per eseguire il progetto sul tuo computer.
-
 ### Prerequisiti
 
-- Node.js installato.
-- PostgreSQL installato e attivo.
+- Node.js (v18+)
+- PostgreSQL installato e attivo
 
 ### 1. Clone del Repository
 
@@ -52,17 +72,27 @@ cd JobPilot
    Bash
    cd backend
    npm install
+   Crea un file .env nella cartella backend con le seguenti variabili:
 
-# Crea un file .env nella cartella backend con le tue variabili DB e JWT
+Snippet di codice
+PORT=5000
+DATABASE_URL=postgres://utente:password@localhost:5432/jobpilot
+JWT_SECRET=la_tua_super_chiave_segreta
+GEMINI_API_KEY=la_tua_api_key_google_ai
+FRONTEND_URL=http://localhost:5173
+Inizializza il Database (creazione tabelle):
 
-# Esegui lo script per inizializzare il Database
+Bash
+
+# Puoi visitare http://localhost:5000/setup-db una volta avviato il server, oppure usare uno script se presente
 
 node src/db/initDb.js
+Avvia il server:
 
-# Avvia il server
-
+Bash
 npm run dev
-Il server partirà su http://localhost:5000
+
+# Il server partirà su http://localhost:5000
 
 3. Configurazione Frontend
    Apri un nuovo terminale:
@@ -70,17 +100,17 @@ Il server partirà su http://localhost:5000
 Bash
 cd frontend
 npm install
-
-# Avvia il client
-
 npm run dev
-L'app sarà accessibile su http://localhost:5173
+
+# L'app sarà accessibile su http://localhost:5173
 
 🔮 Prossimi Sviluppi (Roadmap)
-[ ] Integrazione OpenAI per generazione automatica lettere di presentazione.
+[ ] Integrazione Google Calendar: Sincronizzazione automatica delle date dei colloqui.
 
-[ ] Upload file per allegare il CV originale alla card.
+[ ] Gamification: Badge e livelli basati sul numero di candidature inviate.
 
-[ ] Integrazione con Google Calendar per i colloqui.
+[ ] Community: Condivisione anonima di stipendi e feedback sui colloqui.
 
-Realizzato con ❤️ per il Portfolio Developer.
+[ ] Multi-Language: Supporto completo per Inglese e altre lingue.
+
+Realizzato da Dario Lo Forti - 2026
