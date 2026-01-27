@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa"; // <--- Importiamo il plugin PWA
+import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,15 +14,15 @@ export default defineConfig({
         name: "JobPilot AI",
         short_name: "JobPilot",
         description: "Il tuo assistente di carriera AI",
-        theme_color: "#0f172a", // Colore della barra di stato (Blu scuro del tuo tema)
-        background_color: "#0f172a", // Colore di sfondo allo splash screen
-        display: "standalone", // <--- Questo nasconde la barra URL del browser!
+        theme_color: "#0f172a", // Colore della barra di stato
+        background_color: "#0f172a", // Colore di sfondo splash screen
+        display: "standalone", // Nasconde la barra URL
         scope: "/",
         start_url: "/",
         orientation: "portrait",
         icons: [
           {
-            src: "/pwa-192x192.png", // Assicurati di mettere queste immagini in /public
+            src: "/pwa-192x192.png",
             sizes: "192x192",
             type: "image/png",
           },
@@ -39,11 +39,20 @@ export default defineConfig({
           },
         ],
       },
+      // 🔥 FIX PER L'ERRORE DI BUILD SU RENDER
+      // Alziamo il limite della cache a 5 MB (il default è 2 MB e il tuo file è 2.75 MB)
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
     }),
   ],
+  // Opzionale: Evita warning nel terminale per file grossi
+  build: {
+    chunkSizeWarningLimit: 3000, // 3000 kB (3 MB)
+  },
   server: {
     proxy: {
-      // Ogni volta che il frontend chiama "/api", Vite lo gira a localhost:5000
+      // Proxy per sviluppo locale
       "/api": {
         target: "http://localhost:5000",
         changeOrigin: true,
