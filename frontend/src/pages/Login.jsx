@@ -2,21 +2,16 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   TextField, Button, Paper, Typography, Box, 
-  InputAdornment, IconButton 
+  InputAdornment, IconButton, CircularProgress 
 } from '@mui/material';
-import { Visibility, VisibilityOff, Google } from '@mui/icons-material'; 
+import { Visibility, VisibilityOff } from '@mui/icons-material'; 
 import toast from 'react-hot-toast';
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false); 
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  // 🔥 LOGICA URL INTELLIGENTE
-  const isDev = window.location.hostname === 'localhost';
-  const GOOGLE_AUTH_URL = isDev 
-    ? "http://localhost:5000/api/auth/google" 
-    : "https://jobpilot-app-mr2e.onrender.com/api/auth/google";
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,6 +19,7 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -38,17 +34,19 @@ export default function Login() {
         localStorage.setItem('user', JSON.stringify(data.user));
         toast.success('Login effettuato!');
         
-        // 🛡️ REDIRECT INTELLIGENTE (Admin vs User)
+        // Redirect condizionale Admin/User
         if (data.user.is_admin) {
-            navigate('/admin'); // Vai al pannello di controllo
+            navigate('/admin');
         } else {
-            navigate('/dashboard'); // Vai alla dashboard utente
+            navigate('/dashboard');
         }
       } else {
         toast.error(data.error || 'Errore nel login');
       }
     } catch (error) {
       toast.error('Errore di connessione al server');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,27 +58,9 @@ export default function Login() {
             Bentornato 👋
           </Typography>
           <Typography className="text-slate-500 dark:text-slate-400">
-            Inserisci le tue credenziali per accedere.
+            Accedi con la tua email e password.
           </Typography>
         </Box>
-
-        {/* GOOGLE LOGIN BUTTON */}
-        <div className="mb-6">
-            <Button
-                fullWidth
-                variant="outlined"
-                href={GOOGLE_AUTH_URL}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-white/20 dark:text-white dark:hover:bg-white/5 py-3 font-bold rounded-xl normal-case flex items-center gap-2"
-                startIcon={<Google className="text-red-500"/>}
-            >
-                Continua con Google
-            </Button>
-            
-            <div className="relative mt-6 mb-4">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-700"></div></div>
-                <div className="relative flex justify-center text-sm"><span className="px-2 bg-white dark:bg-slate-800 text-slate-400">oppure email</span></div>
-            </div>
-        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <TextField
@@ -141,9 +121,10 @@ export default function Login() {
             fullWidth
             variant="contained"
             size="large"
+            disabled={loading}
             className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform hover:-translate-y-1"
           >
-            Accedi
+            {loading ? <CircularProgress size={24} color="inherit" /> : "Accedi"}
           </Button>
         </form>
 
