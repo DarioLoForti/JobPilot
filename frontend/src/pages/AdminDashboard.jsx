@@ -6,13 +6,13 @@ import {
 } from "@mui/material";
 import { 
   Delete, SupervisorAccount, Work, Person, VerifiedUser, 
-  Error as ErrorIcon, BugReport, Refresh
+  Error as ErrorIcon, BugReport, Refresh, Login as LoginIcon 
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
-  const [logs, setLogs] = useState([]); // <--- NUOVO: Stato per i logs
+  const [logs, setLogs] = useState([]); 
   const [stats, setStats] = useState({ 
     totalUsers: 0, 
     totalJobs: 0, 
@@ -20,7 +20,7 @@ export default function AdminDashboard() {
     recentErrors: 0 
   });
   const [loading, setLoading] = useState(true);
-  const [tabValue, setTabValue] = useState(0); // 0 = Utenti, 1 = Logs
+  const [tabValue, setTabValue] = useState(0); 
 
   useEffect(() => {
     fetchData();
@@ -31,17 +31,14 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("token");
       
-      // 1. Fetch Users
       const usersRes = await fetch("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // 2. Fetch Stats
       const statsRes = await fetch("/api/admin/stats", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // 3. Fetch Logs (NUOVO)
       const logsRes = await fetch("/api/admin/logs", {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -71,7 +68,7 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         toast.success("Utente eliminato.");
-        fetchData(); // Ricarica tutto
+        fetchData(); 
       }
     } catch (error) {
       toast.error("Errore eliminazione.");
@@ -91,6 +88,30 @@ export default function AdminDashboard() {
       fetchData(); 
     } catch (error) {
       toast.error("Errore pulizia log");
+    }
+  };
+
+  // 🔥 NUOVA FUNZIONE IMPERSONATE
+  const handleImpersonate = async (userId) => {
+    if (!window.confirm("Attenzione: Accederai come questo utente e verrai disconnesso dall'Admin.")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/admin/users/${userId}/impersonate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        toast.success(`Loggato come ${data.user.first_name}!`);
+        window.location.href = "/dashboard"; // Refresh forzato
+      } else {
+        toast.error(data.error || "Errore accesso");
+      }
+    } catch (error) {
+      toast.error("Errore server");
     }
   };
 
@@ -230,11 +251,21 @@ export default function AdminDashboard() {
                     </TableCell>
                     <TableCell align="center">
                       {!user.is_admin && (
-                        <Tooltip title="Elimina Utente">
-                          <IconButton onClick={() => handleDeleteUser(user.id)} color="error">
-                            <Delete />
-                          </IconButton>
-                        </Tooltip>
+                        <div className="flex justify-center gap-1">
+                          {/* IMPERSONATE BUTTON */}
+                          <Tooltip title="Entra come Utente">
+                            <IconButton onClick={() => handleImpersonate(user.id)} className="text-blue-500">
+                                <LoginIcon />
+                            </IconButton>
+                          </Tooltip>
+
+                          {/* DELETE BUTTON */}
+                          <Tooltip title="Elimina Utente">
+                            <IconButton onClick={() => handleDeleteUser(user.id)} color="error">
+                              <Delete />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>

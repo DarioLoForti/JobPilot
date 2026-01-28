@@ -1,5 +1,13 @@
 import { query } from "../config/db.js";
-import { logError } from "../utils/logger.js"; // 👈 Importante: Importiamo il logger
+import { logError } from "../utils/logger.js";
+import jwt from "jsonwebtoken"; // <--- FONDAMENTALE PER IMPERSONATE
+
+// Helper per generare Token (lo ricreo qui per comodità)
+const generateToken = (id, isAdmin) => {
+  return jwt.sign({ id, is_admin: isAdmin }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+};
 
 // 1. LISTA UTENTI (Con statistiche Job)
 export const getAllUsers = async (req, res) => {
@@ -12,7 +20,7 @@ export const getAllUsers = async (req, res) => {
         u.email, 
         u.created_at,
         u.is_admin,
-        u.google_id, -- Aggiunto per vedere chi usa Google
+        u.google_id, 
         COUNT(j.id) as total_jobs
       FROM users u
       LEFT JOIN job_applications j ON u.id = j.user_id
@@ -22,7 +30,6 @@ export const getAllUsers = async (req, res) => {
     const result = await query(text);
     res.json(result.rows);
   } catch (error) {
-    // Salviamo l'errore nel DB per vederlo nella dashboard
     await logError("Admin", "Errore recupero lista utenti", error, req.user.id);
     res.status(500).json({ error: "Errore server admin" });
   }
@@ -32,10 +39,9 @@ export const getAllUsers = async (req, res) => {
 export const deleteUser = async (req, res) => {
   const { id } = req.params;
   try {
-    // Cancelliamo prima i dati collegati (pulizia manuale per sicurezza)
     await query("DELETE FROM job_applications WHERE user_id = $1", [id]);
     await query("DELETE FROM cv_history WHERE user_id = $1", [id]);
-    await query("DELETE FROM ai_usage WHERE user_id = $1", [id]); // Pulisce uso AI
+    await query("DELETE FROM ai_usage WHERE user_id = $1", [id]);
     await query("DELETE FROM users WHERE id = $1", [id]);
 
     res.json({ message: "Utente eliminato con successo." });
@@ -50,17 +56,14 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// 3. STATISTICHE GLOBALI (Potenziate)
+// 3. STATISTICHE GLOBALI
 export const getSystemStats = async (req, res) => {
   try {
-    // Query parallele per velocità
     const userCountPromise = query("SELECT COUNT(*) FROM users");
     const jobCountPromise = query("SELECT COUNT(*) FROM job_applications");
     const cvCountPromise = query(
       "SELECT COUNT(*) FROM users WHERE cv_filename IS NOT NULL",
     );
-
-    // Conta errori nelle ultime 24 ore
     const errorCountPromise = query(
       "SELECT COUNT(*) FROM system_logs WHERE level = 'ERROR' AND created_at > NOW() - INTERVAL '24 hours'",
     );
@@ -84,10 +87,9 @@ export const getSystemStats = async (req, res) => {
   }
 };
 
-// 4. 🔥 NUOVO: VISUALIZZA LOG DI SISTEMA
+// 4. VISUALIZZA LOG DI SISTEMA
 export const getSystemLogs = async (req, res) => {
   try {
-    // Prende gli ultimi 50 log, unendo l'email dell'utente se disponibile
     const text = `
       SELECT sl.*, u.email as user_email 
       FROM system_logs sl
@@ -98,12 +100,12 @@ export const getSystemLogs = async (req, res) => {
     const result = await query(text);
     res.json(result.rows);
   } catch (error) {
-    console.error("Logger Error:", error); // Fallback console
+    console.error("Logger Error:", error);
     res.status(500).json({ error: "Impossibile leggere i log" });
   }
 };
 
-// 5. 🔥 NUOVO: SVUOTA LOG
+// 5. SVUOTA LOG
 export const clearSystemLogs = async (req, res) => {
   try {
     await query("DELETE FROM system_logs");
@@ -111,5 +113,42 @@ export const clearSystemLogs = async (req, res) => {
   } catch (error) {
     await logError("Admin", "Errore pulizia log", error, req.user.id);
     res.status(500).json({ error: "Errore pulizia log" });
+  }
+};
+
+// 6. 🔥 IMPERSONIFICA UTENTE (GOD MODE)
+export const impersonateUser = async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Trova l'utente target
+    const userRes = await query("SELECT * FROM users WHERE id = $1", [id]);
+    if (userRes.rows.length === 0)
+      return res.status(404).json({ error: "Utente non trovato" });
+
+    const targetUser = userRes.rows[0];
+
+    // 2. Genera un token valido per LUI
+    const token = generateToken(targetUser.id, targetUser.is_admin);
+
+    // 3. Logga l'azione
+    await logError(
+      "Admin",
+      `Admin ha impersonato l'utente ${targetUser.email}`,
+      {},
+      req.user.id,
+    );
+
+    res.json({
+      token,
+      user: {
+        id: targetUser.id,
+        first_name: targetUser.first_name,
+        email: targetUser.email,
+        is_admin: targetUser.is_admin,
+      },
+    });
+  } catch (error) {
+    await logError("Admin", "Errore impersonificazione", error, req.user.id);
+    res.status(500).json({ error: "Errore impersonificazione" });
   }
 };
