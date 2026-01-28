@@ -8,12 +8,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { query } from "./src/config/db.js";
 
+// IMPORTA LE ROTTE (Puntano tutte a src)
 import authRoutes from "./src/routes/authRoutes.js";
 import jobRoutes from "./src/routes/jobRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import aiRoutes from "./src/routes/aiRoutes.js";
 import coachRoutes from "./src/routes/coachRoutes.js";
-import adminRoutes from "./src/routes/adminRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js"; // ✅ Corretto
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +26,7 @@ const app = express();
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
+// MIDDLEWARE DI SICUREZZA E PERFORMANCE
 app.use(compression());
 app.use(
   helmet({
@@ -41,11 +44,12 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
+// CORS: Fondamentale per far comunicare Frontend e Backend
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? process.env.FRONTEND_URL
-      : "http://localhost:5173",
+      ? process.env.FRONTEND_URL // Su Render usa la variabile
+      : "http://localhost:5173", // In locale usa Vite
   credentials: true,
 };
 app.use(cors(corsOptions));
@@ -53,6 +57,9 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// ==========================================
+// 🚦 DEFINIZIONE ROTTE API (PRIMA DEL FRONTEND!)
+// ==========================================
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/users", userRoutes);
@@ -61,59 +68,34 @@ app.use("/api/coach", coachRoutes);
 app.use("/api/admin", adminRoutes);
 
 // ==========================================
-// 🛠️ FIX DATABASE (AGGIORNAMENTO SCHEMA)
-// ==========================================
-app.get("/fix-db", async (req, res) => {
-  try {
-    console.log("🛠️ Inizio aggiornamento schema database...");
-
-    // 1. Colonna per il link (Estensione)
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS job_link TEXT",
-    );
-
-    // 2. Colonna per il logo (Estetica)
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS company_logo TEXT",
-    );
-
-    // 3. 🔥 COLONNA MANCANTE (Fix attuale)
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS interview_date TIMESTAMP",
-    );
-
-    // 4. Tabella CV History
-    await query(`
-      CREATE TABLE IF NOT EXISTS cv_history (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        score INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    console.log("✅ Database aggiornato con successo.");
-    res.send(
-      "✅ Database fixato! Aggiunte colonne: job_link, company_logo, interview_date.",
-    );
-  } catch (error) {
-    console.error("❌ Errore fix db:", error);
-    res.status(500).send("Errore fix db: " + error.message);
-  }
-});
-
-// ==========================================
-// 🛠️ SETUP DATABASE (SOLO NUOVI UTENTI)
+// 🛠️ SETUP DATABASE COMPLETO (Admin + Google)
 // ==========================================
 app.get("/setup-db", async (req, res) => {
   try {
+    console.log("🛠️ Setup DB in corso...");
+
+    // 1. AGGIORNAMENTI UTENTE (Admin & Google)
+    // Eseguiamo ALTER TABLE per essere sicuri che funzioni anche su DB esistenti
+    await query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;`,
+    );
+    await query(`ALTER TABLE users ALTER COLUMN password DROP NOT NULL;`); // Password opzionale per Google
+    await query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;`,
+    );
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;`);
+
+    // 2. CREAZIONE TABELLA USERS (Se non esiste)
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
         email VARCHAR(150) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
+        password VARCHAR(255),
+        google_id VARCHAR(255) UNIQUE,
+        avatar TEXT,
+        is_admin BOOLEAN DEFAULT FALSE,
         phone VARCHAR(50),
         address VARCHAR(255),
         personal_description TEXT,
@@ -130,7 +112,7 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
-    // Aggiornata con tutte le colonne nuove
+    // 3. TABELLA JOB APPLICATIONS
     await query(`
       CREATE TABLE IF NOT EXISTS job_applications (
         id SERIAL PRIMARY KEY,
@@ -140,7 +122,7 @@ app.get("/setup-db", async (req, res) => {
         job_description TEXT,
         job_link TEXT,
         company_logo TEXT,
-        interview_date TIMESTAMP,  -- Eccola qui per i nuovi DB
+        interview_date TIMESTAMP,
         status VARCHAR(50) DEFAULT 'WISH',
         match_score INTEGER,
         analysis_results JSONB,
@@ -151,6 +133,7 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
+    // 4. TABELLA ASSESSMENTS
     await query(`
       CREATE TABLE IF NOT EXISTS assessments (
         id SERIAL PRIMARY KEY,
@@ -163,6 +146,7 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
+    // 5. TABELLA CV HISTORY
     await query(`
       CREATE TABLE IF NOT EXISTS cv_history (
         id SERIAL PRIMARY KEY,
@@ -172,17 +156,52 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
+    console.log("✅ Database configurato con successo.");
     res.send(
-      "✅ Database configurato con successo! Tutte le tabelle complete.",
+      "✅ Database configurato! Tabelle Utenti, Admin e Google Login pronte.",
     );
   } catch (error) {
     console.error(error);
-    res.status(500).send("❌ Errore creazione tabelle: " + error.message);
+    res.status(500).send("❌ Errore setup db: " + error.message);
   }
 });
 
+// ==========================================
+// 🛠️ FIX DATABASE RAPIDO (Solo colonne mancanti)
+// ==========================================
+app.get("/fix-db", async (req, res) => {
+  try {
+    await query(
+      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS job_link TEXT",
+    );
+    await query(
+      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS company_logo TEXT",
+    );
+    await query(
+      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS interview_date TIMESTAMP",
+    );
+    await query(`
+      CREATE TABLE IF NOT EXISTS cv_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    res.send("✅ Fix eseguito.");
+  } catch (error) {
+    res.status(500).send("Errore fix: " + error.message);
+  }
+});
+
+// ==========================================
+// 🌍 GESTIONE FRONTEND (PRODUZIONE)
+// ==========================================
+// Questo blocco deve stare ALLA FINE, dopo tutte le rotte API
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+  // Qualsiasi altra richiesta non gestita dalle API viene mandata al Frontend (React)
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
   });
