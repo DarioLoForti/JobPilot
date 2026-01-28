@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
 
+// Importazione Pagine
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -12,18 +13,22 @@ import Profile from './pages/Profile';
 import Landing from './pages/Landing';
 import Coach from './pages/Coach';
 import JobFinder from './pages/JobFinder';
-import Settings from './pages/Settings'; // <--- IMPORT NUOVO (Pagina Impostazioni)
+import Settings from './pages/Settings';
+import AdminDashboard from './pages/AdminDashboard';
+import AuthSuccess from './pages/AuthSuccess'; // ⚠️ FONDAMENTALE per Google Login
+
+// Importazione Componenti
 import Navbar from './components/Navbar';
 import CookieBanner from './components/CookieBanner';
-import AdminDashboard from './pages/AdminDashboard';
-import AuthSuccess from './pages/AuthSuccess';
 
+// Componente per proteggere le rotte (Redirect se non loggato)
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
 };
 
 function App() {
+  // Gestione Tema (Dark/Light)
   const [mode, setMode] = useState(localStorage.getItem('theme') || 'dark');
 
   useEffect(() => {
@@ -37,6 +42,7 @@ function App() {
     }
   }, [mode]);
 
+  // Configurazione MUI Theme
   const theme = useMemo(() => createTheme({
       palette: {
         mode,
@@ -65,6 +71,7 @@ function App() {
       <Router>
         <div className="min-h-screen bg-slate-100 dark:bg-[#0f172a] text-slate-900 dark:text-slate-100 transition-colors duration-300 relative">
             
+            {/* Sfondo Animato */}
             <div className={`fixed inset-0 z-0 pointer-events-none transition-opacity duration-500 ${mode === 'dark' ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[100px] animate-pulse"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[100px] animate-pulse delay-1000"></div>
@@ -76,18 +83,26 @@ function App() {
                 <Navbar mode={mode} toggleMode={toggleMode} />
                 
                 <Routes>
+                    {/* Rotte Pubbliche */}
                     <Route path="/" element={<Landing />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     
+                    {/* ⚠️ ROTTA CRITICA PER GOOGLE OAUTH */}
+                    <Route path="/auth-success" element={<AuthSuccess />} />
+                    
+                    {/* Rotte Protette */}
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
                     <Route path="/finder" element={<ProtectedRoute><JobFinder /></ProtectedRoute>} />
                     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} /> {/* <--- NUOVA ROTTA */}
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    
+                    {/* Rotta Admin */}
                     <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/auth-success" element={<AuthSuccess />} />
+
+                    {/* Fallback 404 */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
 
