@@ -8,13 +8,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { query } from "./src/config/db.js";
 
-// IMPORTA LE ROTTE (Puntano tutte a src)
+// Importa le rotte
 import authRoutes from "./src/routes/authRoutes.js";
 import jobRoutes from "./src/routes/jobRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import aiRoutes from "./src/routes/aiRoutes.js";
 import coachRoutes from "./src/routes/coachRoutes.js";
-import adminRoutes from "./src/routes/adminRoutes.js"; // ✅ Corretto
+import adminRoutes from "./src/routes/adminRoutes.js";
 
 dotenv.config();
 
@@ -26,7 +26,6 @@ const app = express();
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
-// MIDDLEWARE DI SICUREZZA E PERFORMANCE
 app.use(compression());
 app.use(
   helmet({
@@ -40,16 +39,14 @@ const limiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Troppe richieste da questo IP, riprova più tardi." },
 });
 app.use("/api", limiter);
 
-// CORS: Fondamentale per far comunicare Frontend e Backend
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? process.env.FRONTEND_URL // Su Render usa la variabile
-      : "http://localhost:5173", // In locale usa Vite
+      ? process.env.FRONTEND_URL
+      : "http://localhost:5173",
   credentials: true,
 };
 app.use(cors(corsOptions));
@@ -58,34 +55,24 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ==========================================
-// 🚦 DEFINIZIONE ROTTE API (PRIMA DEL FRONTEND!)
+// 🚨 PRIORITÀ ASSOLUTA: ROTTA SETUP DB
 // ==========================================
-app.use("/api/auth", authRoutes);
-app.use("/api/jobs", jobRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/coach", coachRoutes);
-app.use("/api/admin", adminRoutes);
-
-// ==========================================
-// 🛠️ SETUP DATABASE COMPLETO (Admin + Google)
-// ==========================================
-app.get("/setup-db", async (req, res) => {
+// La metto qui, PRIMA di tutto il resto, e la chiamo /api/setup-db
+app.get("/api/setup-db", async (req, res) => {
   try {
-    console.log("🛠️ Setup DB in corso...");
+    console.log("🛠️ Esecuzione Setup DB...");
 
-    // 1. AGGIORNAMENTI UTENTE (Admin & Google)
-    // Eseguiamo ALTER TABLE per essere sicuri che funzioni anche su DB esistenti
+    // 1. Setup Colonne Utenti (Google + Admin)
     await query(
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;`,
     );
-    await query(`ALTER TABLE users ALTER COLUMN password DROP NOT NULL;`); // Password opzionale per Google
+    await query(`ALTER TABLE users ALTER COLUMN password DROP NOT NULL;`);
     await query(
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;`,
     );
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;`);
 
-    // 2. CREAZIONE TABELLA USERS (Se non esiste)
+    // 2. Creazione Tabelle (Se mancano)
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -112,7 +99,7 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
-    // 3. TABELLA JOB APPLICATIONS
+    // Altre tabelle...
     await query(`
       CREATE TABLE IF NOT EXISTS job_applications (
         id SERIAL PRIMARY KEY,
@@ -133,7 +120,15 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
-    // 4. TABELLA ASSESSMENTS
+    await query(`
+      CREATE TABLE IF NOT EXISTS cv_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        score INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     await query(`
       CREATE TABLE IF NOT EXISTS assessments (
         id SERIAL PRIMARY KEY,
@@ -146,68 +141,38 @@ app.get("/setup-db", async (req, res) => {
       );
     `);
 
-    // 5. TABELLA CV HISTORY
-    await query(`
-      CREATE TABLE IF NOT EXISTS cv_history (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        score INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    console.log("✅ Database configurato con successo.");
+    console.log("✅ Database Setup Completato.");
     res.send(
-      "✅ Database configurato! Tabelle Utenti, Admin e Google Login pronte.",
+      "✅ SUCCESSO: Database aggiornato correttamente (Admin + Google Ready).",
     );
   } catch (error) {
-    console.error(error);
-    res.status(500).send("❌ Errore setup db: " + error.message);
+    console.error("❌ Errore Setup:", error);
+    res.status(500).send("ERRORE: " + error.message);
   }
 });
 
 // ==========================================
-// 🛠️ FIX DATABASE RAPIDO (Solo colonne mancanti)
+// 🚦 ALTRE API
 // ==========================================
-app.get("/fix-db", async (req, res) => {
-  try {
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS job_link TEXT",
-    );
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS company_logo TEXT",
-    );
-    await query(
-      "ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS interview_date TIMESTAMP",
-    );
-    await query(`
-      CREATE TABLE IF NOT EXISTS cv_history (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        score INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    res.send("✅ Fix eseguito.");
-  } catch (error) {
-    res.status(500).send("Errore fix: " + error.message);
-  }
-});
+app.use("/api/auth", authRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/coach", coachRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ==========================================
-// 🌍 GESTIONE FRONTEND (PRODUZIONE)
+// 🌍 GESTIONE FRONTEND (CATCH-ALL)
 // ==========================================
-// Questo blocco deve stare ALLA FINE, dopo tutte le rotte API
+// Questo deve stare SEMPRE per ULTIMO
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-  // Qualsiasi altra richiesta non gestita dalle API viene mandata al Frontend (React)
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
   });
 } else {
   app.get("/", (req, res) => {
-    res.json({ message: "JobPilot API è online in modalità Sviluppo! 🚀" });
+    res.json({ message: "JobPilot API Development Mode" });
   });
 }
 
