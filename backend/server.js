@@ -23,6 +23,15 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// 🔥 DEBUG LOGGER: FONDAMENTALE PER CAPIRE COSA SUCCEDE
+// Questo stampa nei log di Render ogni singola richiesta che arriva al server
+app.use((req, res, next) => {
+  console.log(
+    `📡 [SERVER] Richiesta in arrivo: ${req.method} ${req.originalUrl}`,
+  );
+  next();
+});
+
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
@@ -57,7 +66,6 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // ==========================================
 // 🚨 PRIORITÀ ASSOLUTA: ROTTA SETUP DB
 // ==========================================
-// La metto qui, PRIMA di tutto il resto, e la chiamo /api/setup-db
 app.get("/api/setup-db", async (req, res) => {
   try {
     console.log("🛠️ Esecuzione Setup DB...");
@@ -72,7 +80,7 @@ app.get("/api/setup-db", async (req, res) => {
     );
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;`);
 
-    // 2. Creazione Tabelle (Se mancano)
+    // 2. Creazione Tabelle
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -99,7 +107,6 @@ app.get("/api/setup-db", async (req, res) => {
       );
     `);
 
-    // Altre tabelle...
     await query(`
       CREATE TABLE IF NOT EXISTS job_applications (
         id SERIAL PRIMARY KEY,
@@ -164,7 +171,6 @@ app.use("/api/admin", adminRoutes);
 // ==========================================
 // 🌍 GESTIONE FRONTEND (CATCH-ALL)
 // ==========================================
-// Questo deve stare SEMPRE per ULTIMO
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
   app.get("*", (req, res) => {

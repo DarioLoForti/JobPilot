@@ -9,7 +9,7 @@ import { adminOnly } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
-// Tutte queste rotte richiedono LOGIN (protect) + RUOLO ADMIN (adminOnly)
+// Autenticazione e controllo permessi per tutte le rotte admin
 router.get("/users", protect, adminOnly, getAllUsers);
 router.delete("/users/:id", protect, adminOnly, deleteUser);
 router.get("/stats", protect, adminOnly, getSystemStats);

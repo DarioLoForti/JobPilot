@@ -1,249 +1,31 @@
-import { query } from "../config/db.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import axios from "axios";
-import dotenv from "dotenv";
+import express from "express";
+import {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  googleAuth,
+  googleAuthCallback,
+} from "../controllers/authController.js";
+import { protect } from "../middleware/authMiddleware.js";
 
-dotenv.config();
+const router = express.Router();
 
-// Helper per generare Token
-const generateToken = (id, isAdmin) => {
-  return jwt.sign({ id, is_admin: isAdmin }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
-};
+// 🔥 DEBUG LOGGER: Questo ci dice se la richiesta entra in questo file
+router.use((req, res, next) => {
+  console.log(`🔔 AUTH ROUTE HIT: ${req.method} ${req.originalUrl}`);
+  next();
+});
 
-// =================================================================
-// 🔥 HELPER CONFIGURAZIONE URL (BLINDATO)
-// =================================================================
-const getGoogleConfigs = () => {
-  // Rileva se siamo su Render
-  const isProd = process.env.NODE_ENV === "production";
+// Autenticazione Classica
+router.post("/register", registerUser);
+router.post("/login", loginUser);
 
-  // ⚠️ HARDCODED PER SICUREZZA:
-  // Se siamo in produzione, usiamo FORZATAMENTE l'URL di Render.
-  // Se siamo in locale, usiamo localhost.
-  const callbackUrl = isProd
-    ? "https://jobpilot-app-mr2e.onrender.com/api/auth/google/callback"
-    : "http://localhost:5000/api/auth/google/callback";
+// Recupero Profilo (Richiede Login)
+router.get("/profile", protect, getUserProfile);
 
-  const frontendUrl = isProd
-    ? "https://jobpilot-app-mr2e.onrender.com"
-    : "http://localhost:5173";
+// Autenticazione Google OAuth
+// NOTA: server.js aggiunge "/api/auth", quindi qui usiamo solo "/google"
+router.get("/google", googleAuth);
+router.get("/google/callback", googleAuthCallback);
 
-  return { callbackUrl, frontendUrl };
-};
-
-// =================================================================
-// REGISTRAZIONE UTENTE
-// =================================================================
-export const registerUser = async (req, res) => {
-  const { first_name, last_name, email, password } = req.body;
-
-  try {
-    if (!first_name || !last_name || !email || !password) {
-      return res.status(400).json({ error: "Tutti i campi sono obbligatori" });
-    }
-
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailRegex.test(email))
-      return res.status(400).json({ error: "Email non valida." });
-
-    if (password.length < 8)
-      return res.status(400).json({ error: "Password troppo corta." });
-
-    const userExists = await query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-    if (userExists.rows.length > 0)
-      return res.status(400).json({ error: "Email già registrata." });
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = await query(
-      "INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3, $4) RETURNING id, first_name, last_name, email, is_admin",
-      [first_name, last_name, email, hashedPassword],
-    );
-
-    const user = newUser.rows[0];
-
-    res.status(201).json({
-      token: generateToken(user.id, user.is_admin),
-      user: {
-        id: user.id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        is_admin: user.is_admin,
-      },
-    });
-  } catch (error) {
-    console.error("Errore Registrazione:", error);
-    res.status(500).json({ error: "Errore server" });
-  }
-};
-
-// =================================================================
-// LOGIN UTENTE
-// =================================================================
-export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const result = await query("SELECT * FROM users WHERE email = $1", [email]);
-    const user = result.rows[0];
-
-    if (!user) return res.status(401).json({ error: "Credenziali non valide" });
-
-    if (!user.password)
-      return res
-        .status(400)
-        .json({ error: "Usa il tasto Google per accedere." });
-
-    if (await bcrypt.compare(password, user.password)) {
-      res.json({
-        token: generateToken(user.id, user.is_admin),
-        user: {
-          id: user.id,
-          first_name: user.first_name,
-          email: user.email,
-          is_admin: user.is_admin,
-        },
-      });
-    } else {
-      res.status(401).json({ error: "Credenziali non valide" });
-    }
-  } catch (error) {
-    console.error("Errore Login:", error);
-    res.status(500).json({ error: "Errore server" });
-  }
-};
-
-// =================================================================
-// USER PROFILE
-// =================================================================
-export const getUserProfile = async (req, res) => {
-  try {
-    const userRes = await query(
-      "SELECT id, first_name, last_name, email, is_admin, cv_filename FROM users WHERE id = $1",
-      [req.user.id],
-    );
-    if (userRes.rows.length === 0)
-      return res.status(404).json({ error: "Utente non trovato" });
-    const user = userRes.rows[0];
-    res.json({
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      is_admin: user.is_admin,
-      cv_uploaded: !!user.cv_filename,
-    });
-  } catch (error) {
-    console.error("Errore Profile:", error);
-    res.status(500).json({ error: "Server Error" });
-  }
-};
-
-// =================================================================
-// 1. INIZIA LOGIN GOOGLE (MODIFICATO)
-// =================================================================
-export const googleAuth = (req, res) => {
-  const { callbackUrl } = getGoogleConfigs(); // Prende l'URL forzato
-  console.log("🔵 Google Auth Start. Redirect URI:", callbackUrl);
-
-  const redirectUri = "https://accounts.google.com/o/oauth2/v2/auth";
-  const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    redirect_uri: callbackUrl, // <--- DEVE ESSERE IDENTICO ALLA CALLBACK
-    response_type: "code",
-    scope: "profile email",
-    access_type: "offline",
-    prompt: "consent",
-  });
-  res.redirect(`${redirectUri}?${params.toString()}`);
-};
-
-// =================================================================
-// 2. CALLBACK GOOGLE (DEBUG ATTIVO)
-// =================================================================
-export const googleAuthCallback = async (req, res) => {
-  const { code } = req.query;
-  const { callbackUrl, frontendUrl } = getGoogleConfigs(); // Prende l'URL forzato
-
-  console.log("🟡 Callback ricevuta. Code:", !!code);
-  console.log("🟡 Usando Callback URI:", callbackUrl);
-
-  try {
-    // A. Scambio Codice -> Token
-    const { data } = await axios.post("https://oauth2.googleapis.com/token", {
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      code,
-      redirect_uri: callbackUrl, // <--- FONDAMENTALE: Deve essere identico a googleAuth
-      grant_type: "authorization_code",
-    });
-
-    const { access_token } = data;
-
-    // B. Dati Utente
-    const googleUserRes = await axios.get(
-      "https://www.googleapis.com/oauth2/v1/userinfo",
-      { headers: { Authorization: `Bearer ${access_token}` } },
-    );
-    const googleUser = googleUserRes.data;
-
-    // C. Database Logic
-    const userExist = await query("SELECT * FROM users WHERE email = $1", [
-      googleUser.email,
-    ]);
-    let user;
-
-    if (userExist.rows.length > 0) {
-      user = userExist.rows[0];
-      if (!user.google_id) {
-        await query(
-          "UPDATE users SET google_id = $1, avatar = $2 WHERE id = $3",
-          [googleUser.id, googleUser.picture, user.id],
-        );
-      }
-    } else {
-      const newUser = await query(
-        `INSERT INTO users (first_name, last_name, email, google_id, avatar, is_admin) 
-         VALUES ($1, $2, $3, $4, $5, FALSE) RETURNING *`,
-        [
-          googleUser.given_name,
-          googleUser.family_name,
-          googleUser.email,
-          googleUser.id,
-          googleUser.picture,
-        ],
-      );
-      user = newUser.rows[0];
-    }
-
-    // D. Token e Redirect
-    const token = generateToken(user.id, user.is_admin);
-    res.redirect(
-      `${frontendUrl}/auth-success?token=${token}&user=${encodeURIComponent(JSON.stringify(user))}`,
-    );
-  } catch (error) {
-    // 🔴 DEBUG ERRORI
-    // Se qualcosa fallisce, scriviamo l'errore nell'URL del browser
-    console.error(
-      "🔴 GOOGLE AUTH ERROR:",
-      error.response?.data || error.message,
-    );
-
-    const errorMsg =
-      error.response?.data?.error_description ||
-      error.message ||
-      "UnknownError";
-    const errorCode = error.response?.data?.error || "Error";
-
-    res.redirect(
-      `${frontendUrl}/login?error=${encodeURIComponent(errorCode)}&desc=${encodeURIComponent(errorMsg)}`,
-    );
-  }
-};
+export default router;
