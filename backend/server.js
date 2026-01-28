@@ -169,11 +169,20 @@ app.use("/api/coach", coachRoutes);
 app.use("/api/admin", adminRoutes);
 
 // ==========================================
-// 🌍 GESTIONE FRONTEND (CATCH-ALL)
+// 🌍 GESTIONE FRONTEND (PRODUZIONE)
 // ==========================================
 if (process.env.NODE_ENV === "production") {
+  // 1. Servi i file statici (JS, CSS, Immagini)
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
-  app.get("*", (req, res) => {
+
+  // 2. EVITA IL LOOP: Se manca un file statico (immagine, js), dai 404 invece di index.html
+  app.get("*", (req, res, next) => {
+    // Se la richiesta è per un file con estensione (es. .png, .js), non mandare l'HTML
+    if (req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|json)$/)) {
+      return res.status(404).send("File non trovato");
+    }
+
+    // Altrimenti manda l'app React
     res.sendFile(path.resolve(__dirname, "../frontend", "dist", "index.html"));
   });
 } else {
