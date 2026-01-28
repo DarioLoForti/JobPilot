@@ -24,7 +24,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // 🔥 DEBUG LOGGER: FONDAMENTALE PER CAPIRE COSA SUCCEDE
-// Questo stampa nei log di Render ogni singola richiesta che arriva al server
 app.use((req, res, next) => {
   console.log(
     `📡 [SERVER] Richiesta in arrivo: ${req.method} ${req.originalUrl}`,
@@ -64,13 +63,13 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ==========================================
-// 🚨 PRIORITÀ ASSOLUTA: ROTTA SETUP DB
+// 🚨 PRIORITÀ 1: SETUP DB STANDARD (APP)
 // ==========================================
 app.get("/api/setup-db", async (req, res) => {
   try {
-    console.log("🛠️ Esecuzione Setup DB...");
+    console.log("🛠️ Esecuzione Setup DB Standard...");
 
-    // 1. Setup Colonne Utenti (Google + Admin)
+    // 1. Setup Colonne Utenti
     await query(
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;`,
     );
@@ -80,7 +79,7 @@ app.get("/api/setup-db", async (req, res) => {
     );
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;`);
 
-    // 2. Creazione Tabelle
+    // 2. Creazione Tabelle Standard
     await query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -148,13 +147,70 @@ app.get("/api/setup-db", async (req, res) => {
       );
     `);
 
-    console.log("✅ Database Setup Completato.");
+    console.log("✅ Database Standard Setup Completato.");
+    res.send("✅ SUCCESSO: Database App configurato.");
+  } catch (error) {
+    console.error("❌ Errore Setup Standard:", error);
+    res.status(500).send("ERRORE: " + error.message);
+  }
+});
+
+// ==========================================
+// 🏗️ PRIORITÀ 2: SETUP DB AVANZATO (SUPER ADMIN)
+// ==========================================
+app.get("/api/setup-admin-db", async (req, res) => {
+  try {
+    console.log("🛠️ Creazione tabelle Super Admin...");
+
+    // 1. Tabella SYSTEM LOGS (Per vedere gli errori nel pannello admin)
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id SERIAL PRIMARY KEY,
+        level VARCHAR(20) DEFAULT 'INFO', -- INFO, WARN, ERROR
+        source VARCHAR(50), -- Auth, AI, Database, Server
+        message TEXT,
+        details JSONB,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 2. Tabella SYSTEM SETTINGS (Per la Maintenance Mode e flag globali)
+    await query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(50) PRIMARY KEY,
+        value VARCHAR(255),
+        is_active BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Inizializza la maintenance mode (default spenta) se non esiste
+    await query(`
+      INSERT INTO system_settings (key, value, is_active)
+      VALUES ('maintenance_mode', 'false', false)
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    // 3. Tabella AI USAGE (Per monitorare i costi dei token)
+    await query(`
+      CREATE TABLE IF NOT EXISTS ai_usage (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        feature VARCHAR(50), -- 'CV Analysis', 'Cover Letter', 'Coach'
+        tokens_used INTEGER DEFAULT 0,
+        status VARCHAR(20), -- 'SUCCESS', 'FAILED'
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("✅ Tabelle Admin create con successo.");
     res.send(
-      "✅ SUCCESSO: Database aggiornato correttamente (Admin + Google Ready).",
+      "✅ SUCCESSO: Database Admin aggiornato (Logs, Settings, AI Usage pronti).",
     );
   } catch (error) {
-    console.error("❌ Errore Setup:", error);
-    res.status(500).send("ERRORE: " + error.message);
+    console.error("❌ Errore Setup Admin:", error);
+    res.status(500).send("ERRORE ADMIN SETUP: " + error.message);
   }
 });
 
