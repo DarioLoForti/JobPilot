@@ -15,6 +15,8 @@ import JobFinder from './pages/JobFinder';
 import Settings from './pages/Settings'; // <--- IMPORT NUOVO (Pagina Impostazioni)
 import Navbar from './components/Navbar';
 import CookieBanner from './components/CookieBanner';
+import AdminDashboard from './pages/AdminDashboard';
+import AuthSuccess from './pages/AuthSuccess';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -84,7 +86,8 @@ function App() {
                     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     <Route path="/coach" element={<ProtectedRoute><Coach /></ProtectedRoute>} />
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} /> {/* <--- NUOVA ROTTA */}
-                    
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/auth-success" element={<AuthSuccess />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
 

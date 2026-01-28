@@ -13,7 +13,7 @@ import jobRoutes from "./src/routes/jobRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
 import aiRoutes from "./src/routes/aiRoutes.js";
 import coachRoutes from "./src/routes/coachRoutes.js";
-
+import adminRoutes from "./src/routes/adminRoutes.js";
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,6 +58,7 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/coach", coachRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ==========================================
 // 🛠️ FIX DATABASE (AGGIORNAMENTO SCHEMA)
