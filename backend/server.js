@@ -23,11 +23,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// 🔥 DEBUG LOGGER
+// LOGGER DI PRODUZIONE (Più pulito)
 app.use((req, res, next) => {
-  console.log(
-    `📡 [SERVER] Richiesta in arrivo: ${req.method} ${req.originalUrl}`,
-  );
+  // Logga solo le richieste API, non i file statici per non intasare i log
+  if (req.url.startsWith("/api")) {
+    console.log(`📡 [API] ${req.method} ${req.url}`);
+  }
   next();
 });
 
@@ -62,92 +63,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// =========================================================
-// 🕵️‍♂️ DEBUG DATABASE: VEDIAMO CHI C'È DENTRO
-// =========================================================
-// Vai qui per vedere la lista utenti e il loro stato Admin
-app.get("/api/debug/users", async (req, res) => {
-  try {
-    // Prende tutti gli utenti e mostra ID, Email e se sono Admin
-    const result = await query(
-      "SELECT id, email, is_admin, first_name FROM users ORDER BY id ASC",
-    );
-
-    let html = `<h1>Lista Utenti nel Database</h1><table border='1' cellpadding='10'>
-        <tr><th>ID</th><th>Nome</th><th>Email</th><th>Is Admin?</th><th>Azione</th></tr>`;
-
-    result.rows.forEach((u) => {
-      html += `<tr>
-                <td><b>${u.id}</b></td>
-                <td>${u.first_name}</td>
-                <td>${u.email}</td>
-                <td style="background-color: ${u.is_admin ? "lightgreen" : "pink"}">${u.is_admin}</td>
-                <td>
-                    ${
-                      !u.is_admin
-                        ? `<a href="/api/debug/force-admin/${u.id}" style="color:red; font-weight:bold;">RENDI ADMIN (ID: ${u.id})</a>`
-                        : `<span style="color:green;">GIÀ ADMIN ✅</span>`
-                    }
-                </td>
-            </tr>`;
-    });
-    html += "</table>";
-
-    res.send(html);
-  } catch (error) {
-    res.send("Errore lettura DB: " + error.message);
-  }
-});
-
-// =========================================================
-// 🔨 FORZA ADMIN TRAMITE ID NUMERICO (INFALLIBILE)
-// =========================================================
-app.get("/api/debug/force-admin/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    await query("UPDATE users SET is_admin = TRUE WHERE id = $1", [id]);
-    res.send(`
-            <h1>✅ FATTO!</h1>
-            <p>L'utente con ID <b>${id}</b> è ora SUPER ADMIN.</p>
-            <hr>
-            <h3>⚠️ IMPORTANTE:</h3>
-            <ol>
-                <li>Torna sul sito</li>
-                <li>Fai <b>LOGOUT</b> (Esci dall'account)</li>
-                <li>Fai <b>LOGIN</b> di nuovo</li>
-            </ol>
-            <a href="/api/debug/users">Torna alla lista utenti</a>
-        `);
-  } catch (error) {
-    res.send("Errore aggiornamento: " + error.message);
-  }
-});
-
-// =========================================================
-// 👑 VECCHIA ROTTA PROMOTE (La tengo per backup)
-// =========================================================
-app.get("/api/promote-me/:email", async (req, res) => {
-  const { email } = req.params;
-  try {
-    console.log(`👑 Tentativo promozione admin per: ${email}`);
-    const userCheck = await query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-    if (userCheck.rows.length === 0) {
-      return res.status(404).send(`❌ Utente ${email} non trovato!`);
-    }
-    await query("UPDATE users SET is_admin = TRUE WHERE email = $1", [email]);
-    res.send(
-      `🎉 SUCCESSO! L'utente <b>${email}</b> è ora ADMIN. Fai Logout/Login.`,
-    );
-  } catch (error) {
-    res.status(500).send("Errore: " + error.message);
-  }
-});
-
 // ==========================================
-// 🚨 SETUP DB STANDARD
+// 🛠️ SETUP DB (UTILITY)
 // ==========================================
+// Queste le lasciamo per emergenza/setup iniziale, ma non danno permessi admin
 app.get("/api/setup-db", async (req, res) => {
   try {
     console.log("🛠️ Esecuzione Setup DB Standard...");
@@ -179,9 +98,6 @@ app.get("/api/setup-db", async (req, res) => {
   }
 });
 
-// ==========================================
-// 🏗️ SETUP DB ADMIN
-// ==========================================
 app.get("/api/setup-admin-db", async (req, res) => {
   try {
     console.log("🛠️ Creazione tabelle Super Admin...");
@@ -205,7 +121,7 @@ app.get("/api/setup-admin-db", async (req, res) => {
 });
 
 // ==========================================
-// 🚦 ALTRE API
+// 🚦 API ROUTES PRINCIPALI
 // ==========================================
 app.use("/api/auth", authRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -220,6 +136,7 @@ app.use("/api/admin", adminRoutes);
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
   app.get("*", (req, res, next) => {
+    // Gestione file statici mancanti (evita loop)
     if (req.url.match(/\.(js|css|png|jpg|jpeg|gif|ico|json)$/)) {
       return res.status(404).send("File non trovato");
     }
