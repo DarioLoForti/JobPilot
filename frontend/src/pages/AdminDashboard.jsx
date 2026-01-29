@@ -91,22 +91,32 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🔥 NUOVA FUNZIONE IMPERSONATE
+ // 🔥 IMPERSONATE 2.0 (MODALITÀ MASCHERA)
   const handleImpersonate = async (userId) => {
-    if (!window.confirm("Attenzione: Accederai come questo utente e verrai disconnesso dall'Admin.")) return;
+    // Rimosso il window.confirm brutto. L'azione è reversibile ora.
+    
     try {
-      const token = localStorage.getItem("token");
+      const currentToken = localStorage.getItem("token"); // Il tuo token Admin
+      
       const res = await fetch(`/api/admin/users/${userId}/impersonate`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${currentToken}` }
       });
 
       const data = await res.json();
       if (res.ok) {
+        // 1. SALVA IL TOKEN ADMIN IN UN BACKUP
+        localStorage.setItem("admin_token_backup", currentToken);
+        
+        // 2. IMPOSTA IL TOKEN DELL'UTENTE
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        toast.success(`Loggato come ${data.user.first_name}!`);
-        window.location.href = "/dashboard"; // Refresh forzato
+        
+        toast.success(`👁️ Modalità vista: ${data.user.first_name}`);
+        
+        // 3. VAI ALLA DASHBOARD UTENTE
+        // Usiamo un reload veloce per applicare i cambiamenti in tutta l'app
+        window.location.href = "/dashboard"; 
       } else {
         toast.error(data.error || "Errore accesso");
       }

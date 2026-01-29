@@ -1,8 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useMemo, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
+import { Fab, Tooltip } from '@mui/material'; // 👈 NUOVO IMPORT
+import { SupervisorAccount } from '@mui/icons-material'; // 👈 NUOVO IMPORT ICONA
 
 // Importazione Pagine
 import Login from './pages/Login';
@@ -15,7 +17,7 @@ import Coach from './pages/Coach';
 import JobFinder from './pages/JobFinder';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
-import AuthSuccess from './pages/AuthSuccess'; // ⚠️ FONDAMENTALE per Google Login
+import AuthSuccess from './pages/AuthSuccess'; 
 
 // Importazione Componenti
 import Navbar from './components/Navbar';
@@ -25,6 +27,51 @@ import CookieBanner from './components/CookieBanner';
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
+};
+
+// 🔥 NUOVO COMPONENTE: TASTO "TORNA ADMIN"
+// Questo bottone appare SOLO se stai impersonando qualcuno
+const AdminRestorer = () => {
+  const navigate = useNavigate();
+  // Controlla se esiste il backup del token Admin
+  const adminBackup = localStorage.getItem("admin_token_backup");
+
+  if (!adminBackup) return null; // Se non c'è backup, non mostrare nulla
+
+  const restoreAdmin = () => {
+    // 1. Ripristina il token Admin dal backup
+    localStorage.setItem("token", adminBackup);
+    
+    // 2. Cancella il backup e i dati dell'utente finto
+    localStorage.removeItem("admin_token_backup");
+    localStorage.removeItem("user"); 
+    
+    // 3. Ricarica e vai all'admin panel
+    window.location.href = "/admin";
+  };
+
+  return (
+    <Tooltip title="Esci dalla modalità utente e torna Admin">
+      <Fab 
+        variant="extended"
+        onClick={restoreAdmin}
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 9999, // Sopra a tutto
+          fontWeight: 'bold',
+          color: '#fff',
+          boxShadow: '0px 0px 20px rgba(0,0,0,0.5)',
+          backgroundColor: '#d50000', // Rosso intenso
+          '&:hover': { backgroundColor: '#9b0000' }
+        }}
+      >
+        <SupervisorAccount sx={{ mr: 1 }} />
+        TORNA ADMIN
+      </Fab>
+    </Tooltip>
+  );
 };
 
 function App() {
@@ -88,7 +135,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     
-                    {/* ⚠️ ROTTA CRITICA PER GOOGLE OAUTH */}
+                    {/* Auth Success (Se decidi di riattivare Google) */}
                     <Route path="/auth-success" element={<AuthSuccess />} />
                     
                     {/* Rotte Protette */}
@@ -100,11 +147,14 @@ function App() {
                     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     
                     {/* Rotta Admin */}
-                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
 
                     {/* Fallback 404 */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+
+                {/* 🔥 IL BOTTONE GALLEGGIANTE (Appare solo se impersoni) */}
+                <AdminRestorer />
 
                 <CookieBanner /> 
             </div>
