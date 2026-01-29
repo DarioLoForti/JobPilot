@@ -13,6 +13,7 @@ import {
   tailorCV,
   generateFollowUp,
   generateInterviewQuestions,
+  suggestRoles, // 👈 IMPORT NUOVA FUNZIONE
 } from "../controllers/aiController.js";
 import { auth } from "../middleware/auth.js";
 
@@ -35,5 +36,8 @@ router.post("/icebreaker", auth, generateIcebreaker);
 router.post("/tailor-cv", auth, tailorCV);
 router.post("/follow-up", auth, generateFollowUp);
 router.post("/interview-prep", auth, generateInterviewQuestions);
+
+// 🔥 NUOVA ROTTA SUGGERIMENTI
+router.get("/suggest-roles", auth, suggestRoles);
 
 export default router;

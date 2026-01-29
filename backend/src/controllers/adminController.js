@@ -1,8 +1,8 @@
 import { query } from "../config/db.js";
-import { logError } from "../utils/logger.js";
-import jwt from "jsonwebtoken"; // <--- FONDAMENTALE PER IMPERSONATE
+import { logError, logInfo } from "../utils/logger.js";
+import jwt from "jsonwebtoken";
 
-// Helper per generare Token (lo ricreo qui per comodità)
+// Helper per generare Token
 const generateToken = (id, isAdmin) => {
   return jwt.sign({ id, is_admin: isAdmin }, process.env.JWT_SECRET, {
     expiresIn: "1h",
@@ -130,12 +130,12 @@ export const impersonateUser = async (req, res) => {
     // 2. Genera un token valido per LUI
     const token = generateToken(targetUser.id, targetUser.is_admin);
 
-    // 3. Logga l'azione
-    await logError(
-      "Admin",
-      `Admin ha impersonato l'utente ${targetUser.email}`,
-      {},
-      req.user.id,
+    // 3. Logga l'azione come INFO (non errore!)
+    await logInfo(
+      "Admin", // Fonte
+      `Admin ha impersonato l'utente ${targetUser.email}`, // Messaggio
+      { admin_id: req.user.id, target_id: targetUser.id }, // Dettagli
+      req.user.id, // ID Admin che ha fatto l'azione
     );
 
     res.json({
@@ -148,6 +148,7 @@ export const impersonateUser = async (req, res) => {
       },
     });
   } catch (error) {
+    // Se qualcosa si rompe nel codice, questo RIMANE un errore rosso
     await logError("Admin", "Errore impersonificazione", error, req.user.id);
     res.status(500).json({ error: "Errore impersonificazione" });
   }

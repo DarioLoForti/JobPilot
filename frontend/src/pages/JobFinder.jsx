@@ -9,7 +9,7 @@ import {
   Search, LocationOn, Bolt, OpenInNew, 
   Cancel, WorkOutline, BookmarkBorder, 
   LinkedIn, Google, Sort as SortIcon, Business, Public, Language,
-  Handshake, ContentCopy, Close, Send
+  Handshake, ContentCopy, Close, Send, AutoAwesome, Lightbulb
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 
@@ -24,6 +24,10 @@ export default function JobFinder() {
   const [icebreakerLoading, setIcebreakerLoading] = useState(false);
   const [icebreakerMessages, setIcebreakerMessages] = useState([]);
   const [selectedJobForIce, setSelectedJobForIce] = useState(null);
+
+  // 🔥 STATI PER I SUGGERIMENTI AI
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // Autocomplete
   const [cityOptions, setCityOptions] = useState([]);
@@ -88,7 +92,6 @@ export default function JobFinder() {
         else toast.error("Nessuna offerta trovata con questi filtri.");
       } else {
         const err = await res.json();
-        // Gestione specifica errore 429 (Limite API)
         if (res.status === 429) toast.error("Limite ricerche giornaliero raggiunto. Riprova domani!");
         else toast.error(err.error || "Errore ricerca.");
       }
@@ -96,18 +99,47 @@ export default function JobFinder() {
     finally { setLoading(false); }
   };
 
+  // 🔥 FUNZIONE PER CHIEDERE ALL'AI
+  const fetchAiSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/ai/suggest-roles", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            setSuggestions(data.suggestions);
+            toast.success("Ecco i ruoli adatti a te!");
+        } else {
+            toast.error("Impossibile recuperare suggerimenti");
+        }
+    } catch (error) {
+        toast.error("Errore AI");
+    } finally {
+        setLoadingSuggestions(false);
+    }
+  };
+
+  // Quando clicchi su un chip suggerito
+  const handleSuggestionClick = (role) => {
+      setFilters(prev => ({ ...prev, query: role }));
+      // Opzionale: Lanciare subito la ricerca? Per ora solo setto il campo.
+      toast(`Cerca per: ${role}`, { icon: '🔍' });
+  };
+
   const handleSaveJob = async (job) => {
     setSavingId(job.id);
     const token = localStorage.getItem('token');
     
-    // 🔥 USIAMO IL LINK REALE ORA!
     const realLink = job.link || generateSmartLink(job.title, job.company, 'linkedin');
     const sourceInfo = getJobSource(realLink);
 
     const jobData = {
         company: job.company,
         position: job.title,
-        job_link: realLink, // Link Reale
+        job_link: realLink,
         job_description: job.description || "Descrizione importata da JSearch",
         status: 'wishlist',
         notes: `Compatibilità AI: ${job.matchScore}%\nFonte: ${sourceInfo.name}\nMotivo Match: ${job.explainability || "N/A"}`
@@ -134,7 +166,6 @@ export default function JobFinder() {
 
     try {
         const token = localStorage.getItem('token');
-        // Se non abbiamo skill specifiche, usiamo il titolo come keyword
         const keywords = (job.skills_found && job.skills_found.length > 0) 
             ? job.skills_found.join(", ") 
             : job.title;
@@ -221,7 +252,9 @@ export default function JobFinder() {
 
       {/* SEARCH PANEL */}
       <Paper className="glass-panel p-6 md:p-8 rounded-[2rem] mb-10 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-none">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mb-6">
+        
+        {/* Griglia Input Principale */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mb-4">
           <div className="md:col-span-5">
             <TextField fullWidth placeholder="Ruolo (es. React Developer)" value={filters.query} onChange={(e) => setFilters({...filters, query: e.target.value})} className="input-glass" InputProps={{ startAdornment: <InputAdornment position="start"><Search className="text-slate-400"/></InputAdornment> }} />
           </div>
@@ -238,6 +271,36 @@ export default function JobFinder() {
           </div>
         </div>
 
+        {/* 🔥 SEZIONE SUGGERIMENTI AI */}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+            <Button 
+                size="small" 
+                onClick={fetchAiSuggestions} 
+                disabled={loadingSuggestions}
+                startIcon={loadingSuggestions ? <CircularProgress size={16} /> : <AutoAwesome />}
+                className="bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300 font-bold rounded-full normal-case px-4"
+            >
+                {loadingSuggestions ? "Analizzo il tuo profilo..." : "Consigliami ruoli adatti"}
+            </Button>
+
+            {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 ml-2 animate-fade-in">
+                    {suggestions.map((item, idx) => (
+                        <Tooltip key={idx} title={item.reason} arrow>
+                            <Chip 
+                                icon={<Lightbulb className="text-yellow-500" style={{ fontSize: 16 }} />}
+                                label={item.role} 
+                                onClick={() => handleSuggestionClick(item.role)}
+                                className="cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors font-medium bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10"
+                                variant="outlined"
+                            />
+                        </Tooltip>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        {/* Filtri Avanzati */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <FormControl fullWidth size="small" className="input-glass"><InputLabel>Esperienza</InputLabel><Select value={filters.experience} label="Esperienza" onChange={(e) => setFilters({...filters, experience: e.target.value})} className={selectStyle}><MenuItem value="all">Tutti</MenuItem><MenuItem value="entry">Junior</MenuItem><MenuItem value="mid">Mid</MenuItem><MenuItem value="senior">Senior</MenuItem></Select></FormControl>
             <FormControl fullWidth size="small" className="input-glass"><InputLabel>Tipo</InputLabel><Select value={filters.jobType} label="Tipo" onChange={(e) => setFilters({...filters, jobType: e.target.value})} className={selectStyle}><MenuItem value="all">Tutti</MenuItem><MenuItem value="fulltime">Full-time</MenuItem><MenuItem value="contract">Freelance</MenuItem></Select></FormControl>

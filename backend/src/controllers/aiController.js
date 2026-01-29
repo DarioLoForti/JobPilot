@@ -331,6 +331,63 @@ export const extractCVData = async (req, res) => {
 };
 
 // ------------------------------------------------------------------
+// 🔥 7.5 SUGGERISCI RUOLI (Job Suggestion)
+// ------------------------------------------------------------------
+export const suggestRoles = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Recuperiamo il profilo
+    const userResult = await query(
+      `SELECT first_name, hard_skills, soft_skills, experiences, education, personal_description 
+       FROM users WHERE id = $1`,
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "Utente non trovato" });
+    }
+
+    const user = userResult.rows[0];
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    // Prompt per suggerire ruoli
+    const prompt = `
+      Sei un esperto Career Coach. Analizza il seguente profilo candidato:
+      
+      - Skills Tecniche: ${user.hard_skills || "Non specificate"}
+      - Soft Skills: ${user.soft_skills || "Non specificate"}
+      - Esperienze: ${JSON.stringify(user.experiences || [])}
+      - Educazione: ${JSON.stringify(user.education || [])}
+      - Descrizione: ${user.personal_description || ""}
+
+      COMPITO:
+      Suggerisci 5 "Job Titles" (nomi di ruoli lavorativi) precisi che questo candidato dovrebbe cercare su LinkedIn o Indeed.
+      Per ogni ruolo, dai una brevissima motivazione (max 10 parole).
+
+      FORMATO RISPOSTA (JSON Array puro, niente markdown):
+      [
+        { "role": "Frontend Developer", "reason": "Ottima conoscenza di React e CSS" },
+        { "role": "Full Stack Engineer", "reason": "Esperienza pregressa con Node.js e DB" }
+      ]
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response
+      .text()
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const suggestions = JSON.parse(text);
+    res.json({ suggestions });
+  } catch (error) {
+    handleAIError(res, error, "Job Suggestion");
+  }
+};
+
+// ------------------------------------------------------------------
 // 8. JOB FINDER REALE (CON JSEARCH RAPIDAPI)
 // ------------------------------------------------------------------
 export const searchJobs = async (req, res) => {
@@ -351,19 +408,15 @@ export const searchJobs = async (req, res) => {
   try {
     if (!process.env.RAPIDAPI_KEY) {
       console.error("RAPIDAPI_KEY mancante nel .env");
-      return res
-        .status(500)
-        .json({
-          error: "Configurazione Server incompleta (API Key mancante).",
-        });
+      return res.status(500).json({
+        error: "Configurazione Server incompleta (API Key mancante).",
+      });
     }
 
     if (!term) {
-      return res
-        .status(400)
-        .json({
-          error: "Inserisci un termine di ricerca (es. React Developer).",
-        });
+      return res.status(400).json({
+        error: "Inserisci un termine di ricerca (es. React Developer).",
+      });
     }
 
     // Costruzione query JSearch
@@ -420,10 +473,10 @@ export const searchJobs = async (req, res) => {
       );
 
       const prompt = `Valuta brevemente questi lavori.
-        Dati: ${jobsDataString}
-        
-        Output JSON Array (solo ID e score 0-100):
-        [{ "id": "...", "matchScore": 85, "explainability": "breve motivo" }]`;
+      Dati: ${jobsDataString}
+      
+      Output JSON Array (solo ID e score 0-100):
+      [{ "id": "...", "matchScore": 85, "explainability": "breve motivo" }]`;
 
       const aiResult = await model.generateContent(prompt);
       const aiText = aiResult.response

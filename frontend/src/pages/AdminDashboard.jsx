@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { 
   Paper, Typography, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Chip, IconButton, CircularProgress, 
-  Box, Grid, Card, CardContent, Avatar, Tooltip, Tabs, Tab, Button 
+  Box, Grid, Card, CardContent, Avatar, Tooltip, Tabs, Tab, Button,
+  TextField, InputAdornment
 } from "@mui/material";
 import { 
   Delete, SupervisorAccount, Work, Person, VerifiedUser, 
-  Error as ErrorIcon, BugReport, Refresh, Login as LoginIcon 
+  Error as ErrorIcon, BugReport, Refresh, Login as LoginIcon,
+  Search as SearchIcon, Clear as ClearIcon
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
 
@@ -21,6 +23,9 @@ export default function AdminDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0); 
+
+  // 🔥 STATO PER LA RICERCA
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -125,6 +130,18 @@ export default function AdminDashboard() {
     }
   };
 
+  // 🔥 LOGICA RICERCA SMART
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) return users;
+    
+    const lowerTerm = searchTerm.toLowerCase();
+    return users.filter(user => 
+        (user.first_name && user.first_name.toLowerCase().includes(lowerTerm)) ||
+        (user.last_name && user.last_name.toLowerCase().includes(lowerTerm)) ||
+        (user.email && user.email.toLowerCase().includes(lowerTerm))
+    );
+  }, [users, searchTerm]);
+
   if (loading) return <div className="flex justify-center items-center h-screen"><CircularProgress /></div>;
 
   return (
@@ -213,6 +230,35 @@ export default function AdminDashboard() {
       {/* TAB 0: TABELLA UTENTI */}
       {tabValue === 0 && (
         <Paper className="rounded-2xl shadow-xl overflow-hidden bg-white dark:bg-[#1e293b]">
+          
+          {/* 🔥 BARRA DI RICERCA */}
+          <Box className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Cerca utente per nome, cognome o email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="small"
+                InputProps={{
+                    startAdornment: (
+                        <InputAdornment position="start">
+                            <SearchIcon className="text-slate-400" />
+                        </InputAdornment>
+                    ),
+                    endAdornment: searchTerm && (
+                        <InputAdornment position="end">
+                            <IconButton onClick={() => setSearchTerm("")} size="small">
+                                <ClearIcon />
+                            </IconButton>
+                        </InputAdornment>
+                    ),
+                    style: { borderRadius: 20 }
+                }}
+                className="bg-white dark:bg-slate-900"
+            />
+          </Box>
+
           <TableContainer>
             <Table>
               <TableHead className="bg-slate-100 dark:bg-white/5">
@@ -226,60 +272,68 @@ export default function AdminDashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id} hover className="dark:text-slate-300">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="bg-indigo-100 text-indigo-700 font-bold">
-                          {user.first_name ? user.first_name[0].toUpperCase() : "U"}
-                        </Avatar>
-                        <div>
-                          <Typography className="font-bold dark:text-white">
-                            {user.first_name} {user.last_name}
-                          </Typography>
-                          <Typography variant="caption" className="text-slate-500 block">
-                            {user.email}
-                          </Typography>
+                {filteredUsers.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={6} align="center" className="py-8 text-slate-500">
+                           {searchTerm ? `Nessun risultato per "${searchTerm}"` : "Nessun utente trovato"}
+                        </TableCell>
+                    </TableRow>
+                ) : (
+                    filteredUsers.map((user) => (
+                    <TableRow key={user.id} hover className="dark:text-slate-300">
+                        <TableCell>
+                        <div className="flex items-center gap-3">
+                            <Avatar className="bg-indigo-100 text-indigo-700 font-bold">
+                            {user.first_name ? user.first_name[0].toUpperCase() : "U"}
+                            </Avatar>
+                            <div>
+                            <Typography className="font-bold dark:text-white">
+                                {user.first_name} {user.last_name}
+                            </Typography>
+                            <Typography variant="caption" className="text-slate-500 block">
+                                {user.email}
+                            </Typography>
+                            </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.is_admin ? (
-                        <Chip icon={<VerifiedUser className="text-white"/>} label="Admin" size="small" className="bg-indigo-600 text-white font-bold" />
-                      ) : (
-                        <Chip label="User" size="small" variant="outlined" className="dark:text-slate-300 dark:border-slate-600" />
-                      )}
-                    </TableCell>
-                    <TableCell className="dark:text-slate-300">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip label={user.total_jobs} className={`${user.total_jobs == 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"} font-bold`} />
-                    </TableCell>
-                    <TableCell align="center">
-                        {user.google_id ? "✅" : "-"}
-                    </TableCell>
-                    <TableCell align="center">
-                      {!user.is_admin && (
-                        <div className="flex justify-center gap-1">
-                          {/* IMPERSONATE BUTTON */}
-                          <Tooltip title="Entra come Utente">
-                            <IconButton onClick={() => handleImpersonate(user.id)} className="text-blue-500">
-                                <LoginIcon />
-                            </IconButton>
-                          </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                        {user.is_admin ? (
+                            <Chip icon={<VerifiedUser className="text-white"/>} label="Admin" size="small" className="bg-indigo-600 text-white font-bold" />
+                        ) : (
+                            <Chip label="User" size="small" variant="outlined" className="dark:text-slate-300 dark:border-slate-600" />
+                        )}
+                        </TableCell>
+                        <TableCell className="dark:text-slate-300">
+                        {new Date(user.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell align="center">
+                        <Chip label={user.total_jobs} className={`${user.total_jobs == 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"} font-bold`} />
+                        </TableCell>
+                        <TableCell align="center">
+                            {user.google_id ? "✅" : "-"}
+                        </TableCell>
+                        <TableCell align="center">
+                        {!user.is_admin && (
+                            <div className="flex justify-center gap-1">
+                            {/* IMPERSONATE BUTTON */}
+                            <Tooltip title="Entra come Utente">
+                                <IconButton onClick={() => handleImpersonate(user.id)} className="text-blue-500">
+                                    <LoginIcon />
+                                </IconButton>
+                            </Tooltip>
 
-                          {/* DELETE BUTTON */}
-                          <Tooltip title="Elimina Utente">
-                            <IconButton onClick={() => handleDeleteUser(user.id)} color="error">
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            {/* DELETE BUTTON */}
+                            <Tooltip title="Elimina Utente">
+                                <IconButton onClick={() => handleDeleteUser(user.id)} color="error">
+                                <Delete />
+                                </IconButton>
+                            </Tooltip>
+                            </div>
+                        )}
+                        </TableCell>
+                    </TableRow>
+                    ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
