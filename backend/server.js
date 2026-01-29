@@ -63,32 +63,84 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // =========================================================
-// 👑 ROTTA MAGICA PER DIVENTARE ADMIN (USALA UNA VOLTA SOLA)
+// 🕵️‍♂️ DEBUG DATABASE: VEDIAMO CHI C'È DENTRO
+// =========================================================
+// Vai qui per vedere la lista utenti e il loro stato Admin
+app.get("/api/debug/users", async (req, res) => {
+  try {
+    // Prende tutti gli utenti e mostra ID, Email e se sono Admin
+    const result = await query(
+      "SELECT id, email, is_admin, first_name FROM users ORDER BY id ASC",
+    );
+
+    let html = `<h1>Lista Utenti nel Database</h1><table border='1' cellpadding='10'>
+        <tr><th>ID</th><th>Nome</th><th>Email</th><th>Is Admin?</th><th>Azione</th></tr>`;
+
+    result.rows.forEach((u) => {
+      html += `<tr>
+                <td><b>${u.id}</b></td>
+                <td>${u.first_name}</td>
+                <td>${u.email}</td>
+                <td style="background-color: ${u.is_admin ? "lightgreen" : "pink"}">${u.is_admin}</td>
+                <td>
+                    ${
+                      !u.is_admin
+                        ? `<a href="/api/debug/force-admin/${u.id}" style="color:red; font-weight:bold;">RENDI ADMIN (ID: ${u.id})</a>`
+                        : `<span style="color:green;">GIÀ ADMIN ✅</span>`
+                    }
+                </td>
+            </tr>`;
+    });
+    html += "</table>";
+
+    res.send(html);
+  } catch (error) {
+    res.send("Errore lettura DB: " + error.message);
+  }
+});
+
+// =========================================================
+// 🔨 FORZA ADMIN TRAMITE ID NUMERICO (INFALLIBILE)
+// =========================================================
+app.get("/api/debug/force-admin/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query("UPDATE users SET is_admin = TRUE WHERE id = $1", [id]);
+    res.send(`
+            <h1>✅ FATTO!</h1>
+            <p>L'utente con ID <b>${id}</b> è ora SUPER ADMIN.</p>
+            <hr>
+            <h3>⚠️ IMPORTANTE:</h3>
+            <ol>
+                <li>Torna sul sito</li>
+                <li>Fai <b>LOGOUT</b> (Esci dall'account)</li>
+                <li>Fai <b>LOGIN</b> di nuovo</li>
+            </ol>
+            <a href="/api/debug/users">Torna alla lista utenti</a>
+        `);
+  } catch (error) {
+    res.send("Errore aggiornamento: " + error.message);
+  }
+});
+
+// =========================================================
+// 👑 VECCHIA ROTTA PROMOTE (La tengo per backup)
 // =========================================================
 app.get("/api/promote-me/:email", async (req, res) => {
   const { email } = req.params;
   try {
     console.log(`👑 Tentativo promozione admin per: ${email}`);
-
-    // 1. Controlla se l'utente esiste
     const userCheck = await query("SELECT * FROM users WHERE email = $1", [
       email,
     ]);
     if (userCheck.rows.length === 0) {
-      return res
-        .status(404)
-        .send(`❌ Utente ${email} non trovato! Registrati prima.`);
+      return res.status(404).send(`❌ Utente ${email} non trovato!`);
     }
-
-    // 2. Aggiorna lo stato a ADMIN
     await query("UPDATE users SET is_admin = TRUE WHERE email = $1", [email]);
-
-    console.log(`✅ Utente ${email} è ora SUPER ADMIN.`);
     res.send(
-      `🎉 SUCCESSO! L'utente <b>${email}</b> è ora un SUPER ADMIN.<br><br>⚠️ IMPORTANTE: Ora fai LOGOUT e rientra per aggiornare i tuoi permessi.`,
+      `🎉 SUCCESSO! L'utente <b>${email}</b> è ora ADMIN. Fai Logout/Login.`,
     );
   } catch (error) {
-    console.error("Errore promozione:", error);
     res.status(500).send("Errore: " + error.message);
   }
 });
@@ -108,7 +160,6 @@ app.get("/api/setup-db", async (req, res) => {
     );
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;`);
 
-    // Tabelle (codice abbreviato per leggibilità, ma nel file finale c'è tutto)
     await query(
       `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, first_name VARCHAR(100) NOT NULL, last_name VARCHAR(100) NOT NULL, email VARCHAR(150) UNIQUE NOT NULL, password VARCHAR(255), google_id VARCHAR(255) UNIQUE, avatar TEXT, is_admin BOOLEAN DEFAULT FALSE, phone VARCHAR(50), address VARCHAR(255), personal_description TEXT, hard_skills TEXT, soft_skills TEXT, socials JSONB DEFAULT '[]', experiences JSONB DEFAULT '[]', education JSONB DEFAULT '[]', certifications JSONB DEFAULT '[]', cv_filename VARCHAR(255), cv_file BYTEA, profile_image BYTEA, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`,
     );
